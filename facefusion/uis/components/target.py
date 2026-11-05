@@ -93,14 +93,15 @@ def render() -> None:
 		label = 'Uploaded Targets (Click to Select)',
 		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 1 else None,
 		visible = len(CURRENT_TARGET_UPLOADS) > 1,
-		columns = 4,
+		columns = 5,
 		height = 'auto',
 		allow_preview = False,
 		preview = False,
 		show_download_button = False,
 		show_fullscreen_button = False,
 		object_fit = 'cover',
-		type = 'filepath'
+		type = 'filepath',
+		elem_classes = [ 'compact-gallery' ]
 	)
 
 	# Saved Targets Library
@@ -111,7 +112,7 @@ def render() -> None:
 			REFRESH_TARGET_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		TARGET_LIBRARY_GALLERY = gradio.Gallery(
 			value = CURRENT_TARGET_LIBRARY if CURRENT_TARGET_LIBRARY else None,
-			columns = 4,
+			columns = 5,
 			height = 'auto',
 			allow_preview = False,
 			preview = False,
@@ -119,7 +120,8 @@ def render() -> None:
 			show_download_button = False,
 			show_fullscreen_button = False,
 			object_fit = 'cover',
-			type = 'filepath'
+			type = 'filepath',
+			elem_classes = [ 'compact-gallery' ]
 		)
 
 	register_ui_component('target_image', TARGET_IMAGE)
