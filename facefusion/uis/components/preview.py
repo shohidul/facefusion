@@ -339,56 +339,27 @@ def resolve_real_target_path(target_path : str) -> str:
 	if not target_path or not os.path.exists(target_path):
 		return target_path
 
-	norm_path = os.path.abspath(target_path)
-	is_temp = any(seg in norm_path.lower() for seg in [
-		'/gradio/',
-		'/tmpdir/',
-		'/tmp/',
-		'/temp/',
-		'/var/folders/',
-		'appdata/local/temp'
-	])
-	if not is_temp:
-		return target_path
-
 	filename = os.path.basename(target_path)
-	target_size = os.path.getsize(target_path)
+	try:
+		from facefusion.uis.components.target import TARGET_ORIGIN_MAP
+		if target_path in TARGET_ORIGIN_MAP:
+			return TARGET_ORIGIN_MAP[target_path]
+		if filename in TARGET_ORIGIN_MAP:
+			return TARGET_ORIGIN_MAP[filename]
+	except Exception:
+		pass
 
-	# 1. macOS Spotlight search using mdfind
-	if shutil.which('mdfind'):
-		try:
-			cmd = [ 'mdfind', f'kMDItemFSName == "{filename}"' ]
-			proc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, text = True, timeout = 3)
-			if proc.returncode == 0:
-				matches = [ line.strip() for line in proc.stdout.splitlines() if line.strip() ]
-				real_matches = [
-					m for m in matches
-					if os.path.isfile(m) and not any(t in m.lower() for t in [ '/gradio/', '/tmpdir/', '/tmp/', '/var/folders/' ])
-				]
-				size_matches = [ m for m in real_matches if os.path.getsize(m) == target_size ]
-				if size_matches:
-					return size_matches[0]
-				if real_matches:
-					return real_matches[0]
-		except Exception:
-			pass
+	from facefusion.filesystem import resolve_real_file_path
+	real_path = resolve_real_file_path(target_path)
+	try:
+		from facefusion.uis.components.target import TARGET_ORIGIN_MAP
+		if real_path and real_path != target_path:
+			TARGET_ORIGIN_MAP[target_path] = real_path
+			TARGET_ORIGIN_MAP[filename] = real_path
+	except Exception:
+		pass
 
-	# 2. Check common user locations
-	home = os.path.expanduser('~')
-	common_dirs = [
-		os.path.join(home, 'Downloads'),
-		os.path.join(home, 'Desktop'),
-		os.path.join(home, 'Pictures'),
-		os.path.join(home, 'Documents'),
-		'/Volumes'
-	]
-	for cdir in common_dirs:
-		if os.path.exists(cdir):
-			direct_file = os.path.join(cdir, filename)
-			if os.path.isfile(direct_file) and os.path.getsize(direct_file) == target_size:
-				return direct_file
-
-	return target_path
+	return real_path
 
 
 def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> Any:
@@ -408,7 +379,7 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 
 	target_path = state_manager.get_item('target_path')
 	if not target_path or not is_image(target_path):
-		gradio.Warning('No active target image selected or target is a video.')
+		gradio.Warning('No active target image selected or target is a video.', duration = 2)
 		return fallback()
 
 	source_vision_frames = read_static_images(state_manager.get_item('source_paths'))
@@ -419,7 +390,7 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 	reference_vision_frame = read_static_image(target_path)
 
 	if not is_vision_frame(target_vision_frame) or not is_vision_frame(reference_vision_frame):
-		gradio.Warning('Could not read target image from disk.')
+		gradio.Warning('Could not read target image from disk.', duration = 2)
 		return fallback()
 
 	height, width = target_vision_frame.shape[:2]
@@ -460,8 +431,10 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 			clear_faces()
 			state_manager.clear_item('source_paths')
 			state_manager.set_item('reference_face_position', 0)
-			saved_location = real_target_path if (written_real and real_target_path) else target_path
-			gradio.Info(f'Target replaced on disk:\n{saved_location}')
+			if written_real:
+				gradio.Info(f'Target replaced on disk:\n{real_target_path}', duration = 2)
+			else:
+				gradio.Warning(f'Replaced target in cache only (real disk file not found):\n{target_path}', duration = 3)
 
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
 
@@ -484,9 +457,9 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 					success_results.append(gradio.Gallery())
 			return tuple(success_results)
 		else:
-			gradio.Error(f'Failed to write to {target_path}')
+			gradio.Error(f'Failed to write to {target_path}', duration = 2)
 			return fallback()
 
-	gradio.Error('Failed to process output image.')
+	gradio.Error('Failed to process output image.', duration = 2)
 	return fallback()
 

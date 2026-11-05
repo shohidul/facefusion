@@ -9,7 +9,7 @@ import gradio
 from facefusion import state_manager, translator
 from facefusion.common_helper import get_first
 from facefusion.face_store import clear_faces
-from facefusion.filesystem import is_image, is_video, remove_file, resolve_file_paths
+from facefusion.filesystem import is_image, is_video, remove_file, resolve_file_paths, resolve_real_file_path
 from facefusion.uis.core import register_ui_component
 from facefusion.uis.types import ComponentOptions, File
 
@@ -27,6 +27,7 @@ REFRESH_TARGET_BUTTON : Optional[gradio.Button] = None
 TARGETS_DIR = os.path.join(os.getcwd(), 'data', 'targets')
 CURRENT_TARGET_UPLOADS : List[str] = []
 CURRENT_TARGET_LIBRARY : List[str] = []
+TARGET_ORIGIN_MAP : dict[str, str] = {}
 
 
 def get_target_library_paths() -> List[str]:
@@ -153,12 +154,21 @@ def listen() -> None:
 
 
 def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Gallery, gradio.Accordion]:
-	global CURRENT_TARGET_UPLOADS
+	global CURRENT_TARGET_UPLOADS, TARGET_ORIGIN_MAP
 	clear_faces()
 	file_names = [ file.name for file in files ] if files else []
 	CURRENT_TARGET_UPLOADS = file_names
 
 	if file_names:
+		for fn in file_names:
+			try:
+				real_fn = resolve_real_file_path(fn)
+				if real_fn and real_fn != fn:
+					TARGET_ORIGIN_MAP[fn] = real_fn
+					TARGET_ORIGIN_MAP[os.path.basename(fn)] = real_fn
+			except Exception:
+				pass
+
 		first_file = file_names[0]
 		gallery_update = gradio.Gallery(value = file_names if len(file_names) > 0 else None, visible = len(file_names) > 0)
 
@@ -240,18 +250,18 @@ def save_to_library() -> gradio.Gallery:
 	if target_path and os.path.exists(target_path):
 		CURRENT_TARGET_LIBRARY = get_target_library_paths()
 		if os.path.abspath(target_path).startswith(os.path.abspath(TARGETS_DIR)):
-			gradio.Info('Target is already in the saved library.')
+			gradio.Info('Target is already in the saved library.', duration = 2)
 			return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
 		new_hash = get_file_hash(target_path)
 		if new_hash:
 			for existing_path in CURRENT_TARGET_LIBRARY:
 				if get_file_hash(existing_path) == new_hash:
-					gradio.Info('Duplicate target already exists in library.')
+					gradio.Info('Duplicate target already exists in library.', duration = 2)
 					return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
 		ext = os.path.splitext(target_path)[1] or '.png'
 		dst = os.path.join(TARGETS_DIR, f"target_{int(time.time())}{ext}")
 		shutil.copy2(target_path, dst)
-		gradio.Info('Target successfully saved to library.')
+		gradio.Info('Target successfully saved to library.', duration = 2)
 	CURRENT_TARGET_LIBRARY = get_target_library_paths()
 	return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
 

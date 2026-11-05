@@ -1,7 +1,8 @@
 import glob
 import os
 import shutil
-from typing import List, Optional
+import subprocess
+from typing import List, Optional, Tuple
 
 import facefusion.choices
 
@@ -188,3 +189,95 @@ def remove_directory(directory_path : str) -> bool:
 
 def resolve_relative_path(path : str) -> str:
 	return os.path.abspath(os.path.join(os.path.dirname(__file__), path))
+
+
+def resolve_real_file_path(file_path : str) -> str:
+	if not file_path or not os.path.exists(file_path):
+		return file_path
+
+	norm_path = os.path.abspath(file_path)
+	is_temp = any(seg in norm_path.lower() for seg in [
+		'/gradio/',
+		'/tmpdir/',
+		'/tmp/',
+		'/temp/',
+		'/var/folders/',
+		'appdata/local/temp'
+	])
+	if not is_temp:
+		return file_path
+
+	filename = os.path.basename(file_path)
+	try:
+		target_size = os.path.getsize(file_path)
+	except Exception:
+		target_size = 0
+
+	# 1. macOS Spotlight search using mdfind
+	mdfind_bin = shutil.which('mdfind') or '/usr/bin/mdfind'
+	if os.path.exists(mdfind_bin):
+		queries = [
+			f'kMDItemFSName == "{filename}"',
+			f'-name "{filename}"'
+		]
+		for q in queries:
+			try:
+				cmd = [ mdfind_bin, q ] if not q.startswith('-') else [ mdfind_bin ] + q.split(maxsplit = 1)
+				proc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, text = True, timeout = 3)
+				if proc.returncode == 0:
+					matches = [ line.strip() for line in proc.stdout.splitlines() if line.strip() ]
+					real_matches = [
+						m for m in matches
+						if os.path.isfile(m) and not any(t in m.lower() for t in [ '/gradio/', '/tmpdir/', '/tmp/', '/temp/', '/var/folders/', 'appdata/local/temp' ])
+					]
+					if real_matches:
+						def score_match(m : str) -> Tuple[int, float]:
+							try:
+								exact_size = 1 if target_size > 0 and os.path.getsize(m) == target_size else 0
+								mtime = os.path.getmtime(m)
+								return (exact_size, mtime)
+							except Exception:
+								return (0, 0.0)
+
+						real_matches.sort(key = score_match, reverse = True)
+						return real_matches[0]
+			except Exception:
+				pass
+
+	# 2. Filesystem search for common user directories and mounted volumes
+	search_roots = []
+	home = os.path.expanduser('~')
+	for user_folder in [ 'Downloads', 'Desktop', 'Pictures', 'Documents', 'Movies' ]:
+		folder_path = os.path.join(home, user_folder)
+		if os.path.isdir(folder_path):
+			search_roots.append(folder_path)
+
+	if os.path.exists('/Volumes'):
+		try:
+			for vol in os.listdir('/Volumes'):
+				vol_path = os.path.join('/Volumes', vol)
+				if os.path.isdir(vol_path) and not vol.startswith('.'):
+					search_roots.append(vol_path)
+		except Exception:
+			pass
+
+	for sroot in search_roots:
+		try:
+			direct = os.path.join(sroot, filename)
+			if os.path.isfile(direct):
+				return direct
+
+			for root, dirs, files in os.walk(sroot):
+				depth = root[len(sroot):].count(os.sep)
+				if depth > 4:
+					dirs.clear()
+					continue
+				if filename in files:
+					candidate = os.path.join(root, filename)
+					if os.path.isfile(candidate):
+						return candidate
+		except Exception:
+			continue
+
+	return file_path
+

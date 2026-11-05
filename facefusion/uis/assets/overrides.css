@@ -136,10 +136,14 @@
 :root:root:root:root .toast-body.info,
 :root:root:root:root .toast-body.info .toast-icon,
 :root:root:root:root .toast-body.info .toast-title,
-:root:root:root:root .toast-body.info .toast-text,
 :root:root:root:root .toast-body.info .toast-close
 {
 	color: #0284c7 !important;
+}
+
+:root:root:root:root .toast-body.info .toast-text
+{
+	color: var(--neutral-800) !important;
 }
 
 :root:root:root:root .toast-body.info .timer
@@ -150,10 +154,14 @@
 :root:root:root:root .dark .toast-body.info,
 :root:root:root:root .dark .toast-body.info .toast-icon,
 :root:root:root:root .dark .toast-body.info .toast-title,
-:root:root:root:root .dark .toast-body.info .toast-text,
 :root:root:root:root .dark .toast-body.info .toast-close
 {
 	color: #38bdf8 !important;
+}
+
+:root:root:root:root .dark .toast-body.info .toast-text
+{
+	color: var(--neutral-100) !important;
 }
 
 :root:root:root:root .dark .toast-body.info .timer

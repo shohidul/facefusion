@@ -225,18 +225,18 @@ def save_to_library() -> gradio.Gallery:
 		if first_path and os.path.exists(first_path):
 			CURRENT_LIBRARY_PATHS = get_library_paths()
 			if os.path.abspath(first_path).startswith(os.path.abspath(SOURCES_DIR)):
-				gradio.Info('Image is already in the saved library.')
+				gradio.Info('Image is already in the saved library.', duration = 2)
 				return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
 			new_hash = get_file_hash(first_path)
 			if new_hash:
 				for existing_path in CURRENT_LIBRARY_PATHS:
 					if get_file_hash(existing_path) == new_hash:
-						gradio.Info('Duplicate image already exists in library.')
+						gradio.Info('Duplicate image already exists in library.', duration = 2)
 						return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
 			ext = os.path.splitext(first_path)[1] or '.png'
 			dst = os.path.join(SOURCES_DIR, f"face_{int(time.time())}{ext}")
 			shutil.copy2(first_path, dst)
-			gradio.Info('Face successfully saved to library.')
+			gradio.Info('Face successfully saved to library.', duration = 2)
 	CURRENT_LIBRARY_PATHS = get_library_paths()
 	return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
 
