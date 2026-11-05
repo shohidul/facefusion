@@ -101,16 +101,10 @@ def listen() -> None:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	target_image = get_ui_component('target_image')
-	source_image = get_ui_component('source_image')
-	source_file_accordion = get_ui_component('source_file_accordion')
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
 		outputs = [ target_image, PREVIEW_IMAGE ]
-		if source_image:
-			outputs.append(source_image)
-		if source_file_accordion:
-			outputs.append(source_file_accordion)
 		if reference_face_position_gallery:
 			outputs.append(reference_face_position_gallery)
 		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, inputs = [ PREVIEW_IMAGE ], outputs = outputs)
@@ -386,16 +380,10 @@ def resolve_real_target_path(target_path : str) -> str:
 
 
 def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> Any:
-	source_image = get_ui_component('source_image')
-	source_file_accordion = get_ui_component('source_file_accordion')
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	def fallback() -> Tuple[Any, ...]:
 		fails = [ gradio.Image(), gradio.Image() ]
-		if source_image:
-			fails.append(gradio.Image())
-		if source_file_accordion:
-			fails.append(gradio.Accordion())
 		if reference_face_position_gallery:
 			fails.append(gradio.Gallery())
 		return tuple(fails)
@@ -451,9 +439,8 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 		written_temp = write_image(target_path, saved_vision_frame)
 
 		if written_real or written_temp:
+			read_static_image.cache_clear()
 			clear_faces()
-			state_manager.clear_item('source_paths')
-			state_manager.set_item('reference_face_position', 0)
 			if written_real:
 				gradio.Info(f'Target replaced on disk:\n{real_target_path}', duration = 2)
 			else:
@@ -463,14 +450,8 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 
 			target_img_out = gradio.Image(value = display_frame, visible = True)
 			preview_img_out = gradio.Image(value = display_frame, visible = True, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(saved_vision_frame) ])
-			source_img_out = gradio.Image(value = None, visible = False)
-			source_acc_out = gradio.Accordion(open = True)
 
 			success_results = [ target_img_out, preview_img_out ]
-			if source_image:
-				success_results.append(source_img_out)
-			if source_file_accordion:
-				success_results.append(source_acc_out)
 			if reference_face_position_gallery:
 				try:
 					from facefusion.uis.components.face_selector import update_reference_position_gallery

@@ -141,6 +141,7 @@ def render() -> None:
 
 	register_ui_component('target_image', TARGET_IMAGE)
 	register_ui_component('target_video', TARGET_VIDEO)
+	register_ui_component('target_gallery', TARGET_GALLERY)
 
 
 def listen() -> None:
