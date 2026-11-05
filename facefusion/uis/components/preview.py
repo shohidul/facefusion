@@ -176,13 +176,13 @@ def listen() -> None:
 		target_image.clear(target_clear_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = t_outputs)
 
 	if SAVE_PREVIEW_TO_TARGET_BUTTON:
-		outputs = [ SAVE_PREVIEW_TO_TARGET_BUTTON ]
+		outputs = [ SAVE_PREVIEW_TO_TARGET_BUTTON, PREVIEW_IMAGE ]
 		if reference_face_position_gallery:
 			outputs.append(reference_face_position_gallery)
 		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, outputs = outputs)
 
 	if BATCH_SAVE_PREVIEWS_BUTTON:
-		batch_outputs = [ BATCH_SAVE_PREVIEWS_BUTTON, SAVE_PREVIEW_TO_TARGET_BUTTON, PREVIEW_IMAGE ]
+		batch_outputs = [ BATCH_SAVE_PREVIEWS_BUTTON, PREVIEW_IMAGE ]
 		if reference_face_position_gallery:
 			batch_outputs.append(reference_face_position_gallery)
 		BATCH_SAVE_PREVIEWS_BUTTON.click(batch_save_previews_to_targets, outputs = batch_outputs)
@@ -527,7 +527,7 @@ def save_preview_to_target() -> Any:
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	def fallback() -> Tuple[Any, ...]:
-		fails = [ gradio.Button(value = '❌ Failed to Save (Check Target)') ]
+		fails = [ gradio.Button(value = '❌ Failed to Save (Check Target)'), gradio.skip() ]
 		if reference_face_position_gallery:
 			fails.append(gradio.Gallery())
 		return tuple(fails)
@@ -595,7 +595,7 @@ def save_preview_to_target() -> Any:
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
 			set_hold_preview_frame(display_frame)
 
-			success_results = [ save_btn_out ]
+			success_results = [ save_btn_out, gradio.skip() ]
 			if reference_face_position_gallery:
 				try:
 					from facefusion.uis.components.face_selector import update_reference_position_gallery
@@ -617,8 +617,7 @@ def batch_save_previews_to_targets(progress : gradio.Progress = gradio.Progress(
 	def fallback(error_msg : str = '❌ Batch Replace Failed') -> Tuple[Any, ...]:
 		fails = [
 			gradio.Button(value = error_msg),
-			gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)'),
-			gradio.Image()
+			gradio.skip()
 		]
 		if reference_face_position_gallery:
 			fails.append(gradio.Gallery())
@@ -724,17 +723,11 @@ def batch_save_previews_to_targets(progress : gradio.Progress = gradio.Progress(
 	if replaced_count > 0:
 		gradio.Info(f'Successfully replaced {replaced_count} target image(s) on disk.', duration = 3)
 		batch_btn_out = gradio.Button(value = f'✅ Batch Replaced {replaced_count}/{total} Targets on Disk!')
-		active_filename = os.path.basename(active_real_path or current_target_path) if current_target_path else ''
-		if last_active_replaced_frame is not None and active_filename:
-			save_btn_out = gradio.Button(value = f'✅ Saved & Replaced: {active_filename}', variant = 'primary')
+		if last_active_replaced_frame is not None:
 			display_frame = cv2.cvtColor(last_active_replaced_frame, cv2.COLOR_BGRA2RGBA) if (last_active_replaced_frame.ndim == 3 and last_active_replaced_frame.shape[2] == 4) else cv2.cvtColor(last_active_replaced_frame, cv2.COLOR_BGR2RGB)
 			set_hold_preview_frame(display_frame)
-			preview_out = gradio.Image(value = display_frame, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(display_frame) ])
-		else:
-			save_btn_out = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
-			preview_out = gradio.Image()
 
-		results = [ batch_btn_out, save_btn_out, preview_out ]
+		results = [ batch_btn_out, gradio.skip() ]
 		if reference_face_position_gallery:
 			try:
 				from facefusion.uis.components.face_selector import update_reference_position_gallery
