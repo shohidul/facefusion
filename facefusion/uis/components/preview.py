@@ -15,7 +15,7 @@ from facefusion.content_analyser import analyse_frame
 from facefusion.face_creator import get_one_face
 from facefusion.face_selector import select_faces
 from facefusion.face_store import clear_faces
-from facefusion.filesystem import filter_audio_paths, is_image, is_video
+from facefusion.filesystem import filter_audio_paths, is_image, is_video, normalize_filename
 from facefusion.processors.core import get_processors_modules
 from facefusion.types import AudioFrame, Face, Mask, VisionFrame
 from facefusion.uis import choices as uis_choices
@@ -32,10 +32,15 @@ def get_original_target_frame(target_path : str) -> Optional[VisionFrame]:
 	if not target_path or is_video(target_path):
 		return None
 	filename = os.path.basename(target_path)
+	norm_name = normalize_filename(filename)
+
 	if target_path in ORIGINAL_TARGET_FRAMES:
 		return ORIGINAL_TARGET_FRAMES[target_path].copy()
 	if filename in ORIGINAL_TARGET_FRAMES:
 		return ORIGINAL_TARGET_FRAMES[filename].copy()
+	for k, v in ORIGINAL_TARGET_FRAMES.items():
+		if normalize_filename(os.path.basename(k)) == norm_name:
+			return v.copy()
 
 	frame = read_static_image(target_path, 'rgba')
 	if is_vision_frame(frame):
@@ -45,10 +50,18 @@ def get_original_target_frame(target_path : str) -> Optional[VisionFrame]:
 	return None
 
 
-def register_original_target_frame(target_path : str, frame : Optional[VisionFrame] = None) -> None:
+def register_original_target_frame(target_path : str, frame : Optional[VisionFrame] = None, force : bool = False) -> None:
 	if not target_path or is_video(target_path):
 		return
 	filename = os.path.basename(target_path)
+	norm_name = normalize_filename(filename)
+	if not force:
+		if target_path in ORIGINAL_TARGET_FRAMES or filename in ORIGINAL_TARGET_FRAMES:
+			return
+		for k in ORIGINAL_TARGET_FRAMES.keys():
+			if normalize_filename(os.path.basename(k)) == norm_name:
+				return
+
 	if not is_vision_frame(frame):
 		frame = read_static_image(target_path, 'rgba')
 	if is_vision_frame(frame):
@@ -443,6 +456,13 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 	if not is_vision_frame(target_vision_frame) or not is_vision_frame(reference_vision_frame):
 		gradio.Warning('Could not read target image from disk.', duration = 2)
 		return fallback()
+
+	# Lock the pristine unedited frame into cache before any disk overwrite
+	original_frame = get_original_target_frame(target_path)
+	real_target_path = resolve_real_target_path(target_path)
+	if is_vision_frame(original_frame) and real_target_path:
+		ORIGINAL_TARGET_FRAMES[real_target_path] = original_frame.copy()
+		ORIGINAL_TARGET_FRAMES[os.path.basename(real_target_path)] = original_frame.copy()
 
 	height, width = target_vision_frame.shape[:2]
 	target_resolution = f'{width}x{height}'

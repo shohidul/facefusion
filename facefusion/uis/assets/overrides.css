@@ -219,6 +219,12 @@
 	display: none;
 }
 
+:root:root:root:root .column,
+:root:root:root:root [class*="column"]
+{
+	overflow: visible !important;
+}
+
 :root:root:root:root .image-frame
 {
 	background-image: conic-gradient(#fff 90deg, #999 90deg 180deg, #fff 180deg 270deg, #999 270deg);
@@ -229,7 +235,7 @@
 
 :root:root:root:root .image-frame > img
 {
-	object-fit: cover;
+	object-fit: contain;
 }
 
 :root:root:root:root .preview-sticky-wrap
@@ -248,9 +254,40 @@
 	background: var(--background-fill-primary, #0b0f19);
 }
 
-:root:root:root:root .image-preview.is-landscape
+:root:root:root:root .preview-sticky-wrap .image-preview,
+:root:root:root:root .preview-sticky-wrap .image-preview .image-frame,
+:root:root:root:root .preview-sticky-wrap .image-preview [data-testid="image"],
+:root:root:root:root .preview-sticky-wrap .image-preview div[class*="image-container"]
 {
-	width: 100%;
+	max-height: 52vh !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+}
+
+:root:root:root:root .preview-sticky-wrap .image-preview img,
+:root:root:root:root .preview-sticky-wrap .image-frame > img,
+:root:root:root:root .preview-sticky-wrap img
+{
+	max-height: 52vh !important;
+	width: auto !important;
+	max-width: 100% !important;
+	object-fit: contain !important;
+	margin: 0 auto !important;
+}
+
+:root:root:root:root .preview-sticky-wrap .image-preview.is-landscape img
+{
+	max-height: 52vh !important;
+	max-width: 100% !important;
+	object-fit: contain !important;
+}
+
+:root:root:root:root .preview-sticky-wrap .image-preview.is-portrait img
+{
+	max-height: 52vh !important;
+	width: auto !important;
+	object-fit: contain !important;
 }
 
 :root:root:root:root .block .error
