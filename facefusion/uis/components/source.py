@@ -210,7 +210,7 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 		return (gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False), get_reference_gallery_update(), *resets)
 
 	state_manager.clear_item('source_paths')
-	return (gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), get_reference_gallery_update(), *resets)
+	return (gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(open = True), get_reference_gallery_update(), *resets)
 
 
 def clear_face_preview() -> Tuple[Any, ...]:

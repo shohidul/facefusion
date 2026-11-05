@@ -241,7 +241,7 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 		clear_hold_preview_frame()
 	except Exception:
 		pass
-	return (gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), *resets)
+	return (gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(open = True), *resets)
 
 
 def clear_target_preview() -> Tuple[Any, ...]:
