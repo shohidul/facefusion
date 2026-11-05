@@ -17,6 +17,7 @@ SOURCE_FILE_ACCORDION : Optional[gradio.Accordion] = None
 SOURCE_FILE : Optional[gradio.File] = None
 SOURCE_AUDIO : Optional[gradio.Audio] = None
 SOURCE_IMAGE : Optional[gradio.Image] = None
+SOURCE_PREVIEW_ACCORDION : Optional[gradio.Accordion] = None
 SOURCE_GALLERY : Optional[gradio.Gallery] = None
 LIBRARY_GALLERY : Optional[gradio.Gallery] = None
 SAVE_LIBRARY_BUTTON : Optional[gradio.Button] = None
@@ -55,6 +56,7 @@ def render() -> None:
 	global SOURCE_FILE
 	global SOURCE_AUDIO
 	global SOURCE_IMAGE
+	global SOURCE_PREVIEW_ACCORDION
 	global SOURCE_GALLERY
 	global LIBRARY_GALLERY
 	global SAVE_LIBRARY_BUTTON
@@ -82,7 +84,7 @@ def render() -> None:
 			elem_classes = [ 'compact-file-upload' ]
 		)
 
-	# Uploaded faces gallery (placed above preview)
+	# Uploaded faces gallery (placed first)
 	SOURCE_GALLERY = gradio.Gallery(
 		value = CURRENT_UPLOAD_PATHS if len(CURRENT_UPLOAD_PATHS) > 0 else None,
 		visible = len(CURRENT_UPLOAD_PATHS) > 0,
@@ -98,17 +100,7 @@ def render() -> None:
 		elem_classes = [ 'compact-gallery' ]
 	)
 
-	SOURCE_AUDIO = gradio.Audio(
-		value = source_audio_path if has_source_audio else None,
-		visible = has_source_audio,
-		show_label = False
-	)
-	SOURCE_IMAGE = gradio.Image(
-		value = source_image_path if has_source_image else None,
-		visible = has_source_image,
-		show_label = False
-	)
-
+	# Saved Faces Library gallery (placed second)
 	with gradio.Accordion('📁 Saved Faces Library', open = bool(CURRENT_LIBRARY_PATHS)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
 			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
@@ -129,9 +121,24 @@ def render() -> None:
 			elem_classes = [ 'compact-gallery' ]
 		)
 
+	# Collapsible Source Preview (placed third)
+	with gradio.Accordion('👁️ Source Preview', open = True, elem_classes = [ 'source-preview-accordion' ]) as SOURCE_PREVIEW_ACCORDION:
+		SOURCE_AUDIO = gradio.Audio(
+			value = source_audio_path if has_source_audio else None,
+			visible = has_source_audio,
+			show_label = False
+		)
+		SOURCE_IMAGE = gradio.Image(
+			value = source_image_path if has_source_image else None,
+			visible = has_source_image,
+			show_label = False
+		)
+
 	register_ui_component('source_audio', SOURCE_AUDIO)
 	register_ui_component('source_image', SOURCE_IMAGE)
+	register_ui_component('source_gallery', SOURCE_GALLERY)
 	register_ui_component('source_file_accordion', SOURCE_FILE_ACCORDION)
+	register_ui_component('source_preview_accordion', SOURCE_PREVIEW_ACCORDION)
 
 
 def listen() -> None:

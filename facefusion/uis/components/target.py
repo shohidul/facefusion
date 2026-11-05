@@ -17,6 +17,7 @@ TARGET_FILE_ACCORDION : Optional[gradio.Accordion] = None
 TARGET_FILE : Optional[gradio.File] = None
 TARGET_IMAGE : Optional[gradio.Image] = None
 TARGET_VIDEO : Optional[gradio.Video] = None
+TARGET_PREVIEW_ACCORDION : Optional[gradio.Accordion] = None
 TARGET_GALLERY : Optional[gradio.Gallery] = None
 TARGET_LIBRARY_GALLERY : Optional[gradio.Gallery] = None
 SAVE_TARGET_BUTTON : Optional[gradio.Button] = None
@@ -57,6 +58,7 @@ def render() -> None:
 	global TARGET_FILE
 	global TARGET_IMAGE
 	global TARGET_VIDEO
+	global TARGET_PREVIEW_ACCORDION
 	global TARGET_GALLERY
 	global TARGET_LIBRARY_GALLERY
 	global SAVE_TARGET_BUTTON
@@ -82,7 +84,7 @@ def render() -> None:
 	target_file_names = [ f.get('path') if isinstance(f, dict) else f for f in TARGET_FILE.value ] if TARGET_FILE.value else []
 	CURRENT_TARGET_UPLOADS = target_file_names
 
-	# Uploaded target gallery (placed above preview)
+	# Uploaded target gallery (placed first)
 	TARGET_GALLERY = gradio.Gallery(
 		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 0 else None,
 		visible = len(CURRENT_TARGET_UPLOADS) > 0,
@@ -98,26 +100,7 @@ def render() -> None:
 		elem_classes = [ 'compact-gallery' ]
 	)
 
-	target_image_options : ComponentOptions =\
-	{
-		'show_label': False,
-		'visible': False
-	}
-	target_video_options : ComponentOptions =\
-	{
-		'show_label': False,
-		'visible': False
-	}
-	if is_target_image:
-		target_image_options['value'] = active_target
-		target_image_options['visible'] = True
-	if is_target_video:
-		target_video_options['value'] = active_target
-		target_video_options['visible'] = True
-	TARGET_IMAGE = gradio.Image(**target_image_options)
-	TARGET_VIDEO = gradio.Video(**target_video_options)
-
-	# Saved Targets Library
+	# Saved Targets Library (placed second)
 	CURRENT_TARGET_LIBRARY = get_target_library_paths()
 	with gradio.Accordion('📁 Saved Targets Library', open = bool(CURRENT_TARGET_LIBRARY)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
@@ -139,9 +122,33 @@ def render() -> None:
 			elem_classes = [ 'compact-gallery' ]
 		)
 
+	# Collapsible Target Preview (placed third)
+	target_image_options : ComponentOptions =\
+	{
+		'show_label': False,
+		'visible': False
+	}
+	target_video_options : ComponentOptions =\
+	{
+		'show_label': False,
+		'visible': False
+	}
+	if is_target_image:
+		target_image_options['value'] = active_target
+		target_image_options['visible'] = True
+	if is_target_video:
+		target_video_options['value'] = active_target
+		target_video_options['visible'] = True
+
+	with gradio.Accordion('👁️ Target Preview', open = True, elem_classes = [ 'target-preview-accordion' ]) as TARGET_PREVIEW_ACCORDION:
+		TARGET_IMAGE = gradio.Image(**target_image_options)
+		TARGET_VIDEO = gradio.Video(**target_video_options)
+
 	register_ui_component('target_image', TARGET_IMAGE)
 	register_ui_component('target_video', TARGET_VIDEO)
 	register_ui_component('target_gallery', TARGET_GALLERY)
+	register_ui_component('target_file_accordion', TARGET_FILE_ACCORDION)
+	register_ui_component('target_preview_accordion', TARGET_PREVIEW_ACCORDION)
 
 
 def listen() -> None:
