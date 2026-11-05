@@ -151,21 +151,35 @@ def get_reference_gallery_update() -> gradio.Gallery:
 	return gradio.Gallery()
 
 
+def get_button_resets() -> List[gradio.Button]:
+	resets = []
+	if get_ui_component('save_preview_to_target_button'):
+		resets.append(gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)'))
+	if get_ui_component('batch_save_preview_button'):
+		resets.append(gradio.Button(value = '⚡ Batch Replace All Uploaded Targets'))
+	return resets
+
+
 def listen() -> None:
 	ref_gallery = get_ui_component('reference_face_position_gallery')
 	save_btn = get_ui_component('save_preview_to_target_button')
+	batch_save_btn = get_ui_component('batch_save_preview_button')
 
 	select_outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION, SOURCE_GALLERY, LIBRARY_GALLERY ]
 	if ref_gallery:
 		select_outputs.append(ref_gallery)
 	if save_btn:
 		select_outputs.append(save_btn)
+	if batch_save_btn:
+		select_outputs.append(batch_save_btn)
 
 	update_outputs = [ SOURCE_AUDIO, SOURCE_IMAGE, SOURCE_GALLERY, SOURCE_FILE_ACCORDION ]
 	if ref_gallery:
 		update_outputs.append(ref_gallery)
 	if save_btn:
 		update_outputs.append(save_btn)
+	if batch_save_btn:
+		update_outputs.append(batch_save_btn)
 
 	SOURCE_FILE.change(update, inputs = SOURCE_FILE, outputs = update_outputs)
 	SOURCE_GALLERY.select(select_uploaded_face, outputs = select_outputs)
@@ -184,7 +198,7 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 	has_source_image = has_image(file_names)
 	image_paths = filter_image_paths(file_names) if file_names else []
 	CURRENT_UPLOAD_PATHS = image_paths
-	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	resets = get_button_resets()
 
 	if has_source_audio or has_source_image:
 		source_audio_path = get_first(filter_audio_paths(file_names))
@@ -193,17 +207,17 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 		if state_manager.get_item('face_selector_gender') == 'auto':
 			state_manager.set_item('reference_face_position', 0)
 		gallery_update = gradio.Gallery(value = image_paths if len(image_paths) > 0 else None, visible = len(image_paths) > 0)
-		return gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False), get_reference_gallery_update(), reset_btn
+		return (gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False), get_reference_gallery_update(), *resets)
 
 	state_manager.clear_item('source_paths')
-	return gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), get_reference_gallery_update(), reset_btn
+	return (gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), get_reference_gallery_update(), *resets)
 
 
 def clear_face_preview() -> Tuple[Any, ...]:
 	clear_faces()
 	state_manager.clear_item('source_paths')
-	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
-	return gradio.Image(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
+	resets = get_button_resets()
+	return (gradio.Image(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), *resets)
 
 
 def select_uploaded_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
@@ -214,14 +228,14 @@ def select_uploaded_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
 		clear_hold_preview_frame()
 	except Exception:
 		pass
-	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	resets = get_button_resets()
 	selected_path = extract_selected_path(evt, CURRENT_UPLOAD_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
 		if state_manager.get_item('face_selector_gender') == 'auto':
 			state_manager.set_item('reference_face_position', 0)
-		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
-	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
+		return (gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), *resets)
+	return (gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), *resets)
 
 
 def select_library_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
@@ -232,14 +246,14 @@ def select_library_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
 		clear_hold_preview_frame()
 	except Exception:
 		pass
-	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	resets = get_button_resets()
 	selected_path = extract_selected_path(evt, CURRENT_LIBRARY_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
 		if state_manager.get_item('face_selector_gender') == 'auto':
 			state_manager.set_item('reference_face_position', 0)
-		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
-	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
+		return (gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), *resets)
+	return (gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), *resets)
 
 
 def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image]:

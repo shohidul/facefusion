@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import cv2
 import gradio
@@ -111,9 +111,16 @@ def listen() -> None:
 
 	preview_frame_slider = get_ui_component('preview_frame_slider')
 	save_btn = get_ui_component('save_preview_to_target_button')
+	batch_save_btn = get_ui_component('batch_save_preview_button')
+	btn_outputs = []
+	if save_btn:
+		btn_outputs.append(save_btn)
+	if batch_save_btn:
+		btn_outputs.append(batch_save_btn)
+
 	if preview_frame_slider:
 		REFERENCE_FACE_POSITION_GALLERY.select(update_reference_frame_number, inputs = preview_frame_slider)
-	REFERENCE_FACE_POSITION_GALLERY.select(update_reference_face_position, outputs = [ save_btn ] if save_btn else None)
+	REFERENCE_FACE_POSITION_GALLERY.select(update_reference_face_position, outputs = btn_outputs if btn_outputs else None)
 
 	source_image = get_ui_component('source_image')
 	if source_image:
@@ -180,12 +187,16 @@ def update_face_selector_age_range(face_selector_age_range : Tuple[float, float]
 	return update_reference_position_gallery()
 
 
-def update_reference_face_position(event : gradio.SelectData) -> Optional[gradio.Button]:
+def update_reference_face_position(event : gradio.SelectData) -> Any:
 	state_manager.set_item('reference_face_position', event.index)
-	save_btn = get_ui_component('save_preview_to_target_button')
-	if save_btn:
-		return gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
-	return None
+	resets = []
+	if get_ui_component('save_preview_to_target_button'):
+		resets.append(gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)'))
+	if get_ui_component('batch_save_preview_button'):
+		resets.append(gradio.Button(value = '⚡ Batch Replace All Uploaded Targets'))
+	if len(resets) == 1:
+		return resets[0]
+	return tuple(resets) if resets else None
 
 
 LAST_SOURCE_PATH : Optional[str] = None
