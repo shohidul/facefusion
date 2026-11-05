@@ -121,7 +121,7 @@ def listen() -> None:
 	preview_resolution_dropdown = get_ui_component('preview_resolution_dropdown')
 
 	if preview_mode_dropdown:
-		preview_mode_dropdown.change(update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+		preview_mode_dropdown.change(preview_mode_change_and_update_preview, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	if preview_resolution_dropdown:
 		preview_resolution_dropdown.change(update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
@@ -130,22 +130,23 @@ def listen() -> None:
 		preview_frame_slider.release(update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE, show_progress = 'hidden')
 		preview_frame_slider.change(update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE, show_progress = 'hidden', trigger_mode = 'once')
 
-		reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
-		if reference_face_position_gallery:
-			reference_face_position_gallery.select(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
+	if reference_face_position_gallery:
+		reference_face_position_gallery.select(select_reference_face_and_update_preview, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	for ui_component in get_ui_components(
 	[
 		'source_audio',
 		'source_image',
-		'target_image',
 		'target_video'
 	]):
 		for method in [ 'change', 'clear' ]:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	target_image = get_ui_component('target_image')
-	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
+	if target_image:
+		target_image.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+		target_image.clear(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
 		outputs = [ target_image, PREVIEW_IMAGE ]
@@ -277,6 +278,39 @@ def update_preview_image(preview_mode : PreviewMode, preview_resolution : str, f
 		preview_vision_frame = cv2.cvtColor(preview_vision_frame, cv2.COLOR_BGRA2RGBA)
 		return gradio.Image(value = preview_vision_frame, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(preview_vision_frame) ])
 	return gradio.Image(value = None, elem_classes = None)
+
+
+HOLD_PREVIEW_FRAME : Optional[VisionFrame] = None
+
+
+def clear_hold_preview_frame() -> None:
+	global HOLD_PREVIEW_FRAME
+	HOLD_PREVIEW_FRAME = None
+
+
+def set_hold_preview_frame(frame : VisionFrame) -> None:
+	global HOLD_PREVIEW_FRAME
+	HOLD_PREVIEW_FRAME = frame.copy()
+
+
+def target_change_preview_update(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+	global HOLD_PREVIEW_FRAME
+	if HOLD_PREVIEW_FRAME is not None:
+		return gradio.Image(value = HOLD_PREVIEW_FRAME, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(HOLD_PREVIEW_FRAME) ])
+	clear_faces()
+	return update_preview_image(preview_mode, preview_resolution, frame_number)
+
+
+def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+	clear_hold_preview_frame()
+	clear_faces()
+	return update_preview_image(preview_mode, preview_resolution, frame_number)
+
+
+def preview_mode_change_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+	clear_hold_preview_frame()
+	clear_faces()
+	return update_preview_image(preview_mode, preview_resolution, frame_number)
 
 
 def clear_and_update_preview_image(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
@@ -507,6 +541,7 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 				gradio.Warning(f'Replaced target in cache only (real disk file not found):\n{target_path}', duration = 3)
 
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
+			set_hold_preview_frame(display_frame)
 
 			target_img_out = gradio.Image(value = display_frame, visible = True)
 			preview_img_out = gradio.Image(value = display_frame, visible = True, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(saved_vision_frame) ])

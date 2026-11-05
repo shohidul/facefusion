@@ -178,8 +178,15 @@ def update_reference_face_position(event : gradio.SelectData) -> None:
 	state_manager.set_item('reference_face_position', event.index)
 
 
+LAST_TARGET_PATH : Optional[str] = None
+
+
 def clear_reference_face_position() -> None:
-	state_manager.set_item('reference_face_position', 0)
+	global LAST_TARGET_PATH
+	current_target_path = state_manager.get_item('target_path')
+	if current_target_path != LAST_TARGET_PATH:
+		LAST_TARGET_PATH = current_target_path
+		state_manager.clear_item('reference_face_position')
 
 
 def update_reference_face_distance(reference_face_distance : float) -> None:
@@ -190,8 +197,15 @@ def update_reference_frame_number(reference_frame_number : int = 0) -> None:
 	state_manager.set_item('reference_frame_number', reference_frame_number)
 
 
+LAST_TARGET_FRAME_PATH : Optional[str] = None
+
+
 def clear_reference_frame_number() -> None:
-	state_manager.set_item('reference_frame_number', 0)
+	global LAST_TARGET_FRAME_PATH
+	current_target_path = state_manager.get_item('target_path')
+	if current_target_path != LAST_TARGET_FRAME_PATH:
+		LAST_TARGET_FRAME_PATH = current_target_path
+		state_manager.clear_item('reference_frame_number')
 
 
 def clear_and_update_reference_position_gallery() -> gradio.Gallery:

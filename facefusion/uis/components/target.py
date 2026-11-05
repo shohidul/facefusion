@@ -176,7 +176,8 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 		if is_image(first_file):
 			state_manager.set_item('target_path', first_file)
 			try:
-				from facefusion.uis.components.preview import register_original_target_frame
+				from facefusion.uis.components.preview import clear_hold_preview_frame, register_original_target_frame
+				clear_hold_preview_frame()
 				register_original_target_frame(first_file)
 			except Exception:
 				pass
@@ -192,6 +193,11 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 
 def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
 	clear_faces()
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	state_manager.clear_item('target_path')
 	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True)
 
@@ -199,6 +205,11 @@ def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion
 def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
 	global CURRENT_TARGET_UPLOADS
 	clear_faces()
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	selected_path = extract_selected_path(evt, CURRENT_TARGET_UPLOADS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
@@ -217,6 +228,11 @@ def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradi
 def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
 	global CURRENT_TARGET_LIBRARY
 	clear_faces()
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	selected_path = extract_selected_path(evt, CURRENT_TARGET_LIBRARY)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
