@@ -81,13 +81,13 @@ def render() -> None:
 
 	# Uploaded faces gallery (placed above preview)
 	SOURCE_GALLERY = gradio.Gallery(
-		label = 'Uploaded Faces (Click to Select)',
 		value = CURRENT_UPLOAD_PATHS if len(CURRENT_UPLOAD_PATHS) > 1 else None,
 		visible = len(CURRENT_UPLOAD_PATHS) > 1,
 		columns = 5,
 		height = 'auto',
 		allow_preview = False,
 		preview = False,
+		show_label = False,
 		show_download_button = False,
 		show_fullscreen_button = False,
 		object_fit = 'cover',

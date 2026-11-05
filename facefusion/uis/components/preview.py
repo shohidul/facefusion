@@ -1,3 +1,4 @@
+import os
 from time import sleep
 from typing import List, Optional, Tuple
 
@@ -18,13 +19,15 @@ from facefusion.types import AudioFrame, Face, Mask, VisionFrame
 from facefusion.uis import choices as uis_choices
 from facefusion.uis.core import get_ui_component, get_ui_components, register_ui_component
 from facefusion.uis.types import ComponentOptions, PreviewMode
-from facefusion.vision import detect_frame_orientation, extract_vision_mask, fit_cover_frame, is_vision_frame, merge_vision_mask, obscure_frame, read_static_image, read_static_images, read_video_frame, restrict_frame, select_video_frames, unpack_resolution
+from facefusion.vision import detect_frame_orientation, extract_vision_mask, fit_cover_frame, is_vision_frame, merge_vision_mask, obscure_frame, read_static_image, read_static_images, read_video_frame, restrict_frame, select_video_frames, unpack_resolution, write_image
 
 PREVIEW_IMAGE : Optional[gradio.Image] = None
+SAVE_PREVIEW_TO_TARGET_BUTTON : Optional[gradio.Button] = None
 
 
 def render() -> None:
 	global PREVIEW_IMAGE
+	global SAVE_PREVIEW_TO_TARGET_BUTTON
 
 	preview_image_options : ComponentOptions =\
 	{
@@ -56,7 +59,14 @@ def render() -> None:
 		preview_image_options['elem_classes'] = [ 'image-preview', 'is-' + detect_frame_orientation(preview_vision_frame) ]
 		preview_image_options['visible'] = True
 	PREVIEW_IMAGE = gradio.Image(**preview_image_options)
+	SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
+		'💾 Save Preview to Target (Replace on Disk)',
+		size = 'sm',
+		variant = 'primary',
+		elem_classes = [ 'save-preview-button' ]
+	)
 	register_ui_component('preview_image', PREVIEW_IMAGE)
+	register_ui_component('save_preview_to_target_button', SAVE_PREVIEW_TO_TARGET_BUTTON)
 
 
 def listen() -> None:
@@ -87,6 +97,10 @@ def listen() -> None:
 	]):
 		for method in [ 'change', 'clear' ]:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+
+	target_image = get_ui_component('target_image')
+	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
+		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, inputs = [ PREVIEW_IMAGE ], outputs = [ target_image ])
 
 	for ui_component in get_ui_components(
 	[
@@ -300,7 +314,66 @@ def extract_crop_frame(vision_frame : VisionFrame, face : Face) -> Optional[Visi
 
 
 def prepare_output_frame(target_vision_frame : VisionFrame, temp_vision_frame : VisionFrame, temp_vision_mask : Mask) -> VisionFrame:
-	temp_vision_mask = temp_vision_mask.clip(state_manager.get_item('background_remover_fill_color')[-1], 255)
+	fill_color = state_manager.get_item('background_remover_fill_color')
+	clip_min = fill_color[-1] if fill_color else 0
+	temp_vision_mask = temp_vision_mask.clip(clip_min, 255)
 	temp_vision_frame = merge_vision_mask(temp_vision_frame, temp_vision_mask)
 	temp_vision_frame = cv2.resize(temp_vision_frame, target_vision_frame.shape[1::-1])
 	return temp_vision_frame
+
+
+def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gradio.Image:
+	target_path = state_manager.get_item('target_path')
+	if not target_path or not is_image(target_path):
+		gradio.Warning('No active target image selected or target is a video.')
+		return gradio.Image()
+
+	source_vision_frames = read_static_images(state_manager.get_item('source_paths'))
+	source_audio_frame = create_empty_audio_frame()
+	source_voice_frame = create_empty_audio_frame()
+
+	target_vision_frame = read_static_image(target_path, 'rgba')
+	reference_vision_frame = read_static_image(target_path)
+
+	if not is_vision_frame(target_vision_frame) or not is_vision_frame(reference_vision_frame):
+		gradio.Warning('Could not read target image from disk.')
+		return gradio.Image()
+
+	height, width = target_vision_frame.shape[:2]
+	target_resolution = f'{width}x{height}'
+
+	saved_vision_frame = None
+	try:
+		saved_vision_frame = process_preview_frame(
+			reference_vision_frame,
+			source_vision_frames,
+			source_audio_frame,
+			source_voice_frame,
+			[ target_vision_frame ],
+			'default',
+			target_resolution
+		)
+	except Exception as exception:
+		logger.error(f'Process preview frame failed: {exception}', __name__)
+
+	if not is_vision_frame(saved_vision_frame) and isinstance(preview_image, numpy.ndarray):
+		if preview_image.ndim == 3 and preview_image.shape[2] == 4:
+			saved_vision_frame = cv2.cvtColor(preview_image, cv2.COLOR_RGBA2BGRA)
+		elif preview_image.ndim == 3 and preview_image.shape[2] == 3:
+			saved_vision_frame = cv2.cvtColor(preview_image, cv2.COLOR_RGB2BGR)
+
+	if is_vision_frame(saved_vision_frame):
+		if saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4 and target_path.lower().endswith(('.jpg', '.jpeg')):
+			saved_vision_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2BGR)
+		if write_image(target_path, saved_vision_frame):
+			clear_faces()
+			gradio.Info(f'Target replaced on disk: {os.path.basename(target_path)}')
+			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
+			return gradio.Image(value = display_frame, visible = True)
+		else:
+			gradio.Error(f'Failed to write to {target_path}')
+			return gradio.Image()
+
+	gradio.Error('Failed to process output image.')
+	return gradio.Image()
+

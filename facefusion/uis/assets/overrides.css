@@ -223,3 +223,19 @@
 	max-height: 110px !important;
 	overflow-y: auto !important;
 }
+
+:root:root:root:root .compact-gallery span[data-testid="block-label"],
+:root:root:root:root .compact-gallery .floating,
+:root:root:root:root .compact-gallery [data-testid="block-label"],
+:root:root:root:root .compact-gallery > .label,
+:root:root:root:root .compact-gallery > span
+{
+	display: none !important;
+}
+
+:root:root:root:root .save-preview-button
+{
+	margin-top: 6px !important;
+	width: 100% !important;
+}
+

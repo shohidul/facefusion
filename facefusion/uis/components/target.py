@@ -78,13 +78,13 @@ def render() -> None:
 
 	# Uploaded target gallery (placed above preview)
 	TARGET_GALLERY = gradio.Gallery(
-		label = 'Uploaded Targets (Click to Select)',
 		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 1 else None,
 		visible = len(CURRENT_TARGET_UPLOADS) > 1,
 		columns = 5,
 		height = 'auto',
 		allow_preview = False,
 		preview = False,
+		show_label = False,
 		show_download_button = False,
 		show_fullscreen_button = False,
 		object_fit = 'cover',
