@@ -116,6 +116,7 @@ def listen() -> None:
 
 	for ui_component in get_ui_components(
 	[
+		'source_image',
 		'target_image',
 		'target_video'
 	]):
@@ -178,14 +179,18 @@ def update_reference_face_position(event : gradio.SelectData) -> None:
 	state_manager.set_item('reference_face_position', event.index)
 
 
+LAST_SOURCE_PATH : Optional[str] = None
 LAST_TARGET_PATH : Optional[str] = None
 
 
 def clear_reference_face_position() -> None:
-	global LAST_TARGET_PATH
+	global LAST_SOURCE_PATH, LAST_TARGET_PATH
 	current_target_path = state_manager.get_item('target_path')
-	if current_target_path != LAST_TARGET_PATH:
+	current_source_paths = state_manager.get_item('source_paths')
+	first_source = current_source_paths[0] if current_source_paths else None
+	if current_target_path != LAST_TARGET_PATH or first_source != LAST_SOURCE_PATH:
 		LAST_TARGET_PATH = current_target_path
+		LAST_SOURCE_PATH = first_source
 		state_manager.set_item('reference_face_position', 0)
 
 
