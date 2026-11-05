@@ -6,11 +6,11 @@ import cv2
 import numpy
 from cv2.typing import Size
 
+from facefusion import ffprobe, video_manager
 from facefusion.common_helper import is_windows
 from facefusion.filesystem import get_file_extension, is_image, is_video
-from facefusion.thread_helper import thread_semaphore
+from facefusion.thread_helper import thread_lock, thread_semaphore
 from facefusion.types import ColorMode, Duration, Fps, Mask, Orientation, Resolution, Scale, VisionFrame
-from facefusion.video_manager import get_video_capture
 
 
 def read_static_images(image_paths : List[str], color_mode : ColorMode = 'rgb') -> List[VisionFrame]:
@@ -77,29 +77,39 @@ def read_static_video_frame(video_path : str, frame_number : int = 0) -> Optiona
 
 def read_video_frame(video_path : str, frame_number : int = 0) -> Optional[VisionFrame]:
 	if is_video(video_path):
-		video_capture = get_video_capture(video_path)
+		video_reader = video_manager.get_reader(video_path, 'read_video_frame')
 
-		if video_capture and video_capture.isOpened():
-			frame_total = video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
-
-			with thread_semaphore():
-				video_capture.set(cv2.CAP_PROP_POS_FRAMES, min(frame_total, frame_number - 1))
-				has_vision_frame, vision_frame = video_capture.read()
-
-			if has_vision_frame:
-				return vision_frame
+		with thread_semaphore():
+			video_manager.conditional_seek_video_reader(video_reader, frame_number)
+			return video_manager.read_video_frame(video_reader)
 
 	return None
 
 
+def select_video_frames(video_path : str, frame_number : int = 0, frame_offset : int = 2) -> List[VisionFrame]:
+	vision_frames = []
+	frame_start = frame_number - frame_offset
+	frame_end = frame_number + frame_offset
+
+	if is_video(video_path):
+		with thread_lock():
+			video_reader = video_manager.get_reader(video_path, 'select_video_frames')
+			frame_set = video_manager.read_video_frames(video_reader, max(frame_start, 0), frame_end)
+
+			for frame_number in range(frame_start, frame_end + 1):
+				vision_frame = create_empty_vision_frame()
+
+				if frame_number in frame_set:
+					vision_frame = frame_set.get(frame_number)
+
+				vision_frames.append(vision_frame)
+
+	return vision_frames
+
+
 def count_video_frame_total(video_path : str) -> int:
 	if is_video(video_path):
-		video_capture = get_video_capture(video_path)
-
-		if video_capture and video_capture.isOpened():
-			with thread_semaphore():
-				video_frame_total = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-				return video_frame_total
+		return ffprobe.extract_static_video_metadata(video_path).get('frame_total')
 
 	return 0
 
@@ -107,19 +117,25 @@ def count_video_frame_total(video_path : str) -> int:
 def predict_video_frame_total(video_path : str, fps : Fps, trim_frame_start : int, trim_frame_end : int) -> int:
 	if is_video(video_path):
 		video_fps = detect_video_fps(video_path)
-		extract_frame_total = count_trim_frame_total(video_path, trim_frame_start, trim_frame_end) * fps / video_fps
-		return math.floor(extract_frame_total)
+		trim_frame_start, trim_frame_end = restrict_trim_frame(video_path, trim_frame_start, trim_frame_end)
+		extract_frame_start = resolve_extract_frame_number(video_fps, fps, trim_frame_start)
+		extract_frame_end = resolve_extract_frame_number(video_fps, fps, trim_frame_end)
+
+		return extract_frame_end - extract_frame_start
 	return 0
+
+
+def resolve_extract_frame_number(video_fps : Fps, fps : Fps, frame_number : int) -> int:
+	return math.floor(frame_number * fps / video_fps + 0.5)
+
+
+def resolve_target_frame_number(video_fps : Fps, fps : Fps, frame_number : int) -> int:
+	return math.ceil((frame_number + 0.5) * video_fps / fps) - 1
 
 
 def detect_video_fps(video_path : str) -> Optional[float]:
 	if is_video(video_path):
-		video_capture = get_video_capture(video_path)
-
-		if video_capture and video_capture.isOpened():
-			with thread_semaphore():
-				video_fps = video_capture.get(cv2.CAP_PROP_FPS)
-				return video_fps
+		return ffprobe.extract_static_video_metadata(video_path).get('fps')
 
 	return None
 
@@ -167,13 +183,7 @@ def restrict_trim_frame(video_path : str, trim_frame_start : Optional[int], trim
 
 def detect_video_resolution(video_path : str) -> Optional[Resolution]:
 	if is_video(video_path):
-		video_capture = get_video_capture(video_path)
-
-		if video_capture and video_capture.isOpened():
-			with thread_semaphore():
-				width = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-				height = video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
-				return int(width), int(height)
+		return ffprobe.extract_static_video_metadata(video_path).get('resolution')
 
 	return None
 
@@ -305,6 +315,14 @@ def calculate_histogram_difference(source_vision_frame : VisionFrame, target_vis
 def blend_vision_frames(source_vision_frame : VisionFrame, target_vision_frame : VisionFrame, blend_factor : float) -> VisionFrame:
 	blend_vision_frame = cv2.addWeighted(source_vision_frame, 1 - blend_factor, target_vision_frame, blend_factor, 0)
 	return blend_vision_frame
+
+
+def create_empty_vision_frame() -> VisionFrame:
+	return numpy.zeros((1, 1, 3)).astype(numpy.uint8)
+
+
+def is_vision_frame(vision_frame : VisionFrame) -> bool:
+	return numpy.ndim(vision_frame) == 3
 
 
 def create_tile_frames(vision_frame : VisionFrame, size : Size) -> Tuple[List[VisionFrame], int, int]:

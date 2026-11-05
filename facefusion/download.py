@@ -32,6 +32,7 @@ def conditional_download(download_directory_path : str, urls : List[str]) -> Non
 					curl_builder.set_timeout(5),
 					curl_builder.set_retry(5)
 				)
+
 				open_curl(commands)
 				current_size = initial_size
 				progress.set_postfix(download_providers = state_manager.get_item('download_providers'), file_name = download_file_name)
@@ -48,14 +49,16 @@ def get_static_download_size(url : str) -> int:
 		curl_builder.ping(url),
 		curl_builder.set_timeout(5)
 	)
+
 	process = open_curl(commands)
 	lines = reversed(process.stdout.readlines())
 
-	for line in lines:
-		__line__ = line.decode().lower()
-		if 'content-length:' in __line__:
-			_, content_length = __line__.split('content-length:')
-			return int(content_length)
+	if process.wait() == 0:
+		for line in lines:
+			__line__ = line.decode().lower()
+			if 'content-length:' in __line__:
+				_, content_length = __line__.split('content-length:')
+				return int(content_length)
 
 	return 0
 
@@ -66,6 +69,7 @@ def ping_static_url(url : str) -> bool:
 		curl_builder.ping(url),
 		curl_builder.set_timeout(5)
 	)
+
 	process = open_curl(commands)
 	process.communicate()
 	return process.returncode == 0
@@ -93,8 +97,7 @@ def conditional_download_hashes(hash_set : DownloadSet) -> bool:
 		invalid_hash_file_name = get_file_name(invalid_hash_path)
 		logger.error(translator.get('validating_hash_failed').format(hash_file_name = invalid_hash_file_name), __name__)
 
-	if not invalid_hash_paths:
-		process_manager.end()
+	process_manager.end()
 	return not invalid_hash_paths
 
 
@@ -123,8 +126,7 @@ def conditional_download_sources(source_set : DownloadSet) -> bool:
 		if remove_file(invalid_source_path):
 			logger.error(translator.get('deleting_corrupt_source').format(source_file_name = invalid_source_file_name), __name__)
 
-	if not invalid_source_paths:
-		process_manager.end()
+	process_manager.end()
 	return not invalid_source_paths
 
 

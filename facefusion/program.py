@@ -133,6 +133,14 @@ def create_face_selector_program() -> ArgumentParser:
 	return program
 
 
+def create_face_tracker_program() -> ArgumentParser:
+	program = ArgumentParser(add_help = False)
+	group_face_tracker = program.add_argument_group('face tracker')
+	group_face_tracker.add_argument('--face-tracker-score', help = translator.get('help.face_tracker_score'), type = float, default = config.get_float_value('face_tracker', 'face_tracker_score', '0.0'), choices = facefusion.choices.face_tracker_score_range, metavar = create_float_metavar(facefusion.choices.face_tracker_score_range))
+	job_store.register_step_keys([ 'face_tracker_score' ])
+	return program
+
+
 def create_face_masker_program() -> ArgumentParser:
 	program = ArgumentParser(add_help = False)
 	group_face_masker = program.add_argument_group('face masker')
@@ -161,8 +169,16 @@ def create_frame_extraction_program() -> ArgumentParser:
 	group_frame_extraction.add_argument('--trim-frame-start', help = translator.get('help.trim_frame_start'), type = int, default = facefusion.config.get_int_value('frame_extraction', 'trim_frame_start'))
 	group_frame_extraction.add_argument('--trim-frame-end', help = translator.get('help.trim_frame_end'), type = int, default = facefusion.config.get_int_value('frame_extraction', 'trim_frame_end'))
 	group_frame_extraction.add_argument('--temp-frame-format', help = translator.get('help.temp_frame_format'), default = config.get_str_value('frame_extraction', 'temp_frame_format', 'png'), choices = facefusion.choices.temp_frame_formats)
-	group_frame_extraction.add_argument('--keep-temp', help = translator.get('help.keep_temp'), action = 'store_true', default = config.get_bool_value('frame_extraction', 'keep_temp'))
-	job_store.register_step_keys([ 'trim_frame_start', 'trim_frame_end', 'temp_frame_format', 'keep_temp' ])
+	group_frame_extraction.add_argument('--temp-pixel-format', help = translator.get('help.temp_pixel_format'), default = config.get_str_value('frame_extraction', 'temp_pixel_format', 'bgr24'), choices = facefusion.choices.temp_pixel_formats)
+	job_store.register_step_keys([ 'trim_frame_start', 'trim_frame_end', 'temp_frame_format', 'temp_pixel_format' ])
+	return program
+
+
+def create_frame_distribution_program() -> ArgumentParser:
+	program = ArgumentParser(add_help = False)
+	group_frame_distribution = program.add_argument_group('frame distribution')
+	group_frame_distribution.add_argument('--target-frame-amount', help = translator.get('help.target_frame_amount'), type = int, default = config.get_int_value('frame_distribution', 'target_frame_amount', '2'), choices = facefusion.choices.target_frame_amount_range, metavar = create_int_metavar(facefusion.choices.target_frame_amount_range))
+	job_store.register_step_keys([ 'target_frame_amount' ])
 	return program
 
 
@@ -181,6 +197,15 @@ def create_output_creation_program() -> ArgumentParser:
 	group_output_creation.add_argument('--output-video-scale', help = translator.get('help.output_video_scale'), type = float, default = config.get_float_value('output_creation', 'output_video_scale', '1.0'), choices = facefusion.choices.output_video_scale_range)
 	group_output_creation.add_argument('--output-video-fps', help = translator.get('help.output_video_fps'), type = float, default = config.get_float_value('output_creation', 'output_video_fps'))
 	job_store.register_step_keys([ 'output_image_quality', 'output_image_scale', 'output_audio_encoder', 'output_audio_quality', 'output_audio_volume', 'output_video_encoder', 'output_video_preset', 'output_video_quality', 'output_video_scale', 'output_video_fps' ])
+	return program
+
+
+def create_workflow_program() -> ArgumentParser:
+	program = ArgumentParser(add_help = False)
+	group_workflow = program.add_argument_group('workflow')
+	group_workflow.add_argument('--workflow-mode', help = translator.get('help.workflow_mode'), default = config.get_str_value('workflow', 'workflow_mode', 'auto'), choices = facefusion.choices.workflow_modes)
+	group_workflow.add_argument('--workflow-strategy', help = translator.get('help.workflow_strategy'), default = config.get_str_value('workflow', 'workflow_strategy', 'memory'), choices = facefusion.choices.workflow_strategies)
+	job_store.register_step_keys([ 'workflow_mode', 'workflow_strategy' ])
 	return program
 
 
@@ -245,8 +270,7 @@ def create_memory_program() -> ArgumentParser:
 	program = ArgumentParser(add_help = False)
 	group_memory = program.add_argument_group('memory')
 	group_memory.add_argument('--video-memory-strategy', help = translator.get('help.video_memory_strategy'), default = config.get_str_value('memory', 'video_memory_strategy', 'strict'), choices = facefusion.choices.video_memory_strategies)
-	group_memory.add_argument('--system-memory-limit', help = translator.get('help.system_memory_limit'), type = int, default = config.get_int_value('memory', 'system_memory_limit', '0'), choices = facefusion.choices.system_memory_limit_range, metavar = create_int_metavar(facefusion.choices.system_memory_limit_range))
-	job_store.register_job_keys([ 'video_memory_strategy', 'system_memory_limit' ])
+	job_store.register_job_keys([ 'video_memory_strategy' ])
 	return program
 
 
@@ -285,7 +309,7 @@ def create_step_index_program() -> ArgumentParser:
 
 
 def collect_step_program() -> ArgumentParser:
-	return ArgumentParser(parents = [ create_face_detector_program(), create_face_landmarker_program(), create_face_selector_program(), create_face_masker_program(), create_voice_extractor_program(), create_frame_extraction_program(), create_output_creation_program(), create_processors_program() ], add_help = False)
+	return ArgumentParser(parents = [ create_face_detector_program(), create_face_landmarker_program(), create_face_selector_program(), create_face_tracker_program(), create_face_masker_program(), create_voice_extractor_program(), create_frame_extraction_program(), create_frame_distribution_program(), create_output_creation_program(), create_workflow_program(), create_processors_program() ], add_help = False)
 
 
 def collect_job_program() -> ArgumentParser:

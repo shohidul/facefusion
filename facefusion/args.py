@@ -33,6 +33,7 @@ def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 	apply_state_item('reference_face_position', args.get('reference_face_position'))
 	apply_state_item('reference_face_distance', args.get('reference_face_distance'))
 	apply_state_item('reference_frame_number', args.get('reference_frame_number'))
+	apply_state_item('face_tracker_score', args.get('face_tracker_score'))
 	apply_state_item('face_occluder_model', args.get('face_occluder_model'))
 	apply_state_item('face_parser_model', args.get('face_parser_model'))
 	apply_state_item('face_mask_types', args.get('face_mask_types'))
@@ -44,7 +45,8 @@ def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 	apply_state_item('trim_frame_start', args.get('trim_frame_start'))
 	apply_state_item('trim_frame_end', args.get('trim_frame_end'))
 	apply_state_item('temp_frame_format', args.get('temp_frame_format'))
-	apply_state_item('keep_temp', args.get('keep_temp'))
+	apply_state_item('temp_pixel_format', args.get('temp_pixel_format'))
+	apply_state_item('target_frame_amount', args.get('target_frame_amount'))
 	apply_state_item('output_image_quality', args.get('output_image_quality'))
 	apply_state_item('output_image_scale', args.get('output_image_scale'))
 	apply_state_item('output_audio_encoder', args.get('output_audio_encoder'))
@@ -59,6 +61,8 @@ def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 		output_video_fps = normalize_fps(args.get('output_video_fps')) or detect_video_fps(args.get('target_path'))
 		apply_state_item('output_video_fps', output_video_fps)
 
+	apply_state_item('workflow_mode', args.get('workflow_mode'))
+	apply_state_item('workflow_strategy', args.get('workflow_strategy'))
 	available_processors = [ get_file_name(file_path) for file_path in resolve_file_paths('facefusion/processors/modules') ]
 	apply_state_item('processors', args.get('processors'))
 
@@ -77,7 +81,6 @@ def apply_args(args : Args, apply_state_item : ApplyStateItem) -> None:
 	apply_state_item('benchmark_resolutions', args.get('benchmark_resolutions'))
 	apply_state_item('benchmark_cycle_count', args.get('benchmark_cycle_count'))
 	apply_state_item('video_memory_strategy', args.get('video_memory_strategy'))
-	apply_state_item('system_memory_limit', args.get('system_memory_limit'))
 	apply_state_item('log_level', args.get('log_level'))
 	apply_state_item('halt_on_error', args.get('halt_on_error'))
 	apply_state_item('job_id', args.get('job_id'))

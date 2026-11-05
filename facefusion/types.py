@@ -1,5 +1,7 @@
+import subprocess
 from collections import namedtuple
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TypeAlias, TypedDict
+from threading import Lock
+from typing import Any, Callable, Dict, List, Literal, NotRequired, Optional, Tuple, TypeAlias, TypedDict
 
 import cv2
 import numpy
@@ -29,45 +31,51 @@ FaceScoreSet = TypedDict('FaceScoreSet',
 	'landmarker' : Score
 })
 Embedding : TypeAlias = NDArray[numpy.float64]
-Gender = Literal['female', 'male']
+
 Age : TypeAlias = range
+Gender = Literal['female', 'male']
 Race = Literal['white', 'black', 'latino', 'asian', 'indian', 'arabic']
+
+FaceSelectorGender = Literal['auto', 'female', 'male']
+FaceSelectorRace = Literal['auto', 'white', 'black', 'latino', 'asian', 'indian', 'arabic']
+
 Face = namedtuple('Face',
 [
+	'origin',
 	'bounding_box',
 	'score_set',
 	'landmark_set',
 	'angle',
 	'embedding',
 	'embedding_norm',
-	'gender',
 	'age',
+	'gender',
 	'race'
 ])
-FaceSet : TypeAlias = Dict[str, List[Face]]
-FaceStore = TypedDict('FaceStore',
+FaceSet = TypedDict('FaceSet',
 {
-	'static_faces' : FaceSet
+	'lock': Lock,
+	'faces': NotRequired[List[Face]]
 })
+FaceStore : TypeAlias = Dict[str, FaceSet]
+FaceTrack : TypeAlias = Dict[int, Face]
 
 Language = Literal['en']
 Locales : TypeAlias = Dict[Language, Dict[str, Any]]
 LocalePoolSet : TypeAlias = Dict[str, Locales]
 
-VideoCaptureSet : TypeAlias = Dict[str, cv2.VideoCapture]
-VideoWriterSet : TypeAlias = Dict[str, cv2.VideoWriter]
+WorkflowMode = Literal['auto', 'image-to-image', 'image-to-video']
+WorkflowStrategy = Literal['disk', 'memory']
+
 CameraCaptureSet : TypeAlias = Dict[str, cv2.VideoCapture]
-VideoPoolSet = TypedDict('VideoPoolSet',
-{
-	'capture': VideoCaptureSet,
-	'writer': VideoWriterSet
-})
 CameraPoolSet = TypedDict('CameraPoolSet',
 {
-	'capture': CameraCaptureSet
+	'capture' : CameraCaptureSet
 })
 
 ColorMode = Literal['rgb', 'rgba']
+ColorSpace = Literal['bt601', 'bt709', 'bt2020']
+ColorTransfer : TypeAlias = str
 VisionFrame : TypeAlias = NDArray[Any]
 Mask : TypeAlias = NDArray[Any]
 Points : TypeAlias = NDArray[Any]
@@ -86,13 +94,64 @@ MelFilterBank : TypeAlias = NDArray[Any]
 Voice : TypeAlias = NDArray[Any]
 VoiceChunk : TypeAlias = NDArray[Any]
 
+BitRate : TypeAlias = int
+SampleRate : TypeAlias = int
 Fps : TypeAlias = float
 Duration : TypeAlias = float
+
+Buffer : TypeAlias = bytes
+VisionFrameSet : TypeAlias = Dict[int, VisionFrame]
 Color : TypeAlias = Tuple[int, int, int, int]
 Padding : TypeAlias = Tuple[int, int, int, int]
 Margin : TypeAlias = Tuple[int, int, int, int]
 Orientation = Literal['landscape', 'portrait']
 Resolution : TypeAlias = Tuple[int, int]
+AudioMetadata = TypedDict('AudioMetadata',
+{
+	'duration' : Duration,
+	'frame_total' : int,
+	'channel_total' : int,
+	'sample_rate' : SampleRate,
+	'bit_rate' : BitRate
+})
+VideoMetadata = TypedDict('VideoMetadata',
+{
+	'duration' : Duration,
+	'frame_total' : int,
+	'fps' : Fps,
+	'resolution' : Resolution,
+	'bit_rate' : BitRate,
+	'color_transfer' : ColorTransfer
+})
+VideoReaderMetadata : TypeAlias = VideoMetadata
+VideoWriterMetadata = TypedDict('VideoWriterMetadata',
+{
+	'fps' : Fps,
+	'resolution' : Resolution
+})
+VideoReader = TypedDict('VideoReader',
+{
+	'id' : str,
+	'file_path' : str,
+	'process' : subprocess.Popen[bytes],
+	'metadata' : VideoReaderMetadata,
+	'frame_number' : int
+})
+VideoReaderSet : TypeAlias = Dict[str, VideoReader]
+VideoWriter = TypedDict('VideoWriter',
+{
+	'id' : str,
+	'file_path' : str,
+	'process' : subprocess.Popen[bytes],
+	'metadata' : VideoWriterMetadata
+})
+VideoWriterSet : TypeAlias = Dict[str, VideoWriter]
+VideoPoolSet = TypedDict('VideoPoolSet',
+{
+	'reader' : VideoReaderSet,
+	'writer' : VideoWriterSet
+})
+FrameStoreSet : TypeAlias = Dict[str, VisionFrameSet]
 
 ProcessState = Literal['checking', 'processing', 'stopping', 'pending']
 Args : TypeAlias = Dict[str, Any]
@@ -116,7 +175,7 @@ TableHeader : TypeAlias = str
 TableContent : TypeAlias = Any
 
 FaceDetectorModel = Literal['many', 'retinaface', 'scrfd', 'yolo_face', 'yunet']
-FaceLandmarkerModel = Literal['many', '2dfan4', 'peppa_wutz']
+FaceLandmarkerModel = Literal['many', '2dfan4', 'hrffa', 'peppa_wutz']
 FaceDetectorSet : TypeAlias = Dict[FaceDetectorModel, List[str]]
 FaceSelectorMode = Literal['many', 'one', 'reference']
 FaceSelectorOrder = Literal['left-right', 'right-left', 'top-bottom', 'bottom-top', 'small-large', 'large-small', 'best-worst', 'worst-best']
@@ -134,9 +193,12 @@ AudioFormat = Literal['flac', 'm4a', 'mp3', 'ogg', 'opus', 'wav']
 ImageFormat = Literal['bmp', 'jpeg', 'png', 'tiff', 'webp']
 VideoFormat = Literal['avi', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mxf', 'webm', 'wmv']
 TempFrameFormat = Literal['bmp', 'jpeg', 'png', 'tiff']
+TempPixelFormat = Literal['bgr24', 'bgra']
 AudioTypeSet : TypeAlias = Dict[AudioFormat, str]
 ImageTypeSet : TypeAlias = Dict[ImageFormat, str]
 VideoTypeSet : TypeAlias = Dict[VideoFormat, str]
+
+FrameSet : TypeAlias = Dict[int, str]
 
 AudioEncoder = Literal['flac', 'aac', 'libmp3lame', 'libopus', 'libvorbis', 'pcm_s16le', 'pcm_s32le']
 VideoEncoder = Literal['libx264', 'libx264rgb', 'libx265', 'libvpx-vp9', 'h264_nvenc', 'hevc_nvenc', 'h264_amf', 'hevc_amf', 'h264_qsv', 'hevc_qsv', 'h264_videotoolbox', 'hevc_videotoolbox', 'rawvideo']
@@ -174,7 +236,7 @@ InferenceProvider : TypeAlias = Any
 InferenceOptionSet : TypeAlias = Dict[str, Any]
 ValueAndUnit = TypedDict('ValueAndUnit',
 {
-	'value' : int,
+	'value' : float,
 	'unit' : str
 })
 ExecutionDeviceFramework = TypedDict('ExecutionDeviceFramework',
@@ -290,6 +352,7 @@ StateKey = Literal\
 	'reference_face_position',
 	'reference_face_distance',
 	'reference_frame_number',
+	'face_tracker_score',
 	'face_occluder_model',
 	'face_parser_model',
 	'face_mask_types',
@@ -301,7 +364,8 @@ StateKey = Literal\
 	'trim_frame_start',
 	'trim_frame_end',
 	'temp_frame_format',
-	'keep_temp',
+	'temp_pixel_format',
+	'target_frame_amount',
 	'output_image_quality',
 	'output_image_scale',
 	'output_audio_encoder',
@@ -312,6 +376,8 @@ StateKey = Literal\
 	'output_video_quality',
 	'output_video_scale',
 	'output_video_fps',
+	'workflow_mode',
+	'workflow_strategy',
 	'processors',
 	'open_browser',
 	'ui_layouts',
@@ -320,7 +386,6 @@ StateKey = Literal\
 	'execution_providers',
 	'execution_thread_count',
 	'video_memory_strategy',
-	'system_memory_limit',
 	'log_level',
 	'halt_on_error',
 	'job_id',
@@ -346,20 +411,21 @@ State = TypedDict('State',
 	'benchmark_cycle_count' : int,
 	'face_detector_model' : FaceDetectorModel,
 	'face_detector_size' : str,
-	'face_detector_margin': Margin,
+	'face_detector_margin' : Margin,
 	'face_detector_angles' : List[Angle],
 	'face_detector_score' : Score,
 	'face_landmarker_model' : FaceLandmarkerModel,
 	'face_landmarker_score' : Score,
 	'face_selector_mode' : FaceSelectorMode,
 	'face_selector_order' : FaceSelectorOrder,
-	'face_selector_race' : Race,
-	'face_selector_gender' : Gender,
+	'face_selector_race' : FaceSelectorRace,
+	'face_selector_gender' : FaceSelectorGender,
 	'face_selector_age_start' : int,
 	'face_selector_age_end' : int,
 	'reference_face_position' : int,
 	'reference_face_distance' : float,
 	'reference_frame_number' : int,
+	'face_tracker_score' : Score,
 	'face_occluder_model' : FaceOccluderModel,
 	'face_parser_model' : FaceParserModel,
 	'face_mask_types' : List[FaceMaskType],
@@ -367,11 +433,12 @@ State = TypedDict('State',
 	'face_mask_regions' : List[FaceMaskRegion],
 	'face_mask_blur' : float,
 	'face_mask_padding' : Padding,
-	'voice_extractor_model': VoiceExtractorModel,
+	'voice_extractor_model' : VoiceExtractorModel,
 	'trim_frame_start' : int,
 	'trim_frame_end' : int,
 	'temp_frame_format' : TempFrameFormat,
-	'keep_temp' : bool,
+	'temp_pixel_format' : TempPixelFormat,
+	'target_frame_amount' : int,
 	'output_image_quality' : int,
 	'output_image_scale' : Scale,
 	'output_audio_encoder' : AudioEncoder,
@@ -382,6 +449,8 @@ State = TypedDict('State',
 	'output_video_quality' : int,
 	'output_video_scale' : Scale,
 	'output_video_fps' : float,
+	'workflow_mode' : WorkflowMode,
+	'workflow_strategy' : WorkflowStrategy,
 	'processors' : List[str],
 	'open_browser' : bool,
 	'ui_layouts' : List[str],
@@ -390,7 +459,6 @@ State = TypedDict('State',
 	'execution_providers' : List[ExecutionProvider],
 	'execution_thread_count' : int,
 	'video_memory_strategy' : VideoMemoryStrategy,
-	'system_memory_limit' : int,
 	'log_level' : LogLevel,
 	'halt_on_error' : bool,
 	'job_id' : str,

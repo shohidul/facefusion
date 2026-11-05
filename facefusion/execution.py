@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ElementTree
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import onnxruntime
 
@@ -16,6 +16,16 @@ onnxruntime.set_default_logger_severity(3)
 
 def has_execution_provider(execution_provider : ExecutionProvider) -> bool:
 	return execution_provider in get_available_execution_providers()
+
+
+@lru_cache()
+def get_onnxruntime_version() -> Tuple[int, int, int]:
+	version_split = onnxruntime.get_version_string().split('.')
+	major_version = int(version_split[0])
+	minor_version = int(version_split[1])
+	patch_version = int(version_split[2])
+
+	return major_version, minor_version, patch_version
 
 
 def get_available_execution_providers() -> List[ExecutionProvider]:
@@ -188,7 +198,7 @@ def create_value_and_unit(text : str) -> Optional[ValueAndUnit]:
 
 		return\
 		{
-			'value': int(value),
+			'value': float(value),
 			'unit': str(unit)
 		}
 	return None

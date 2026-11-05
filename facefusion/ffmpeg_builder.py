@@ -5,7 +5,7 @@ from typing import List, Optional
 import numpy
 
 from facefusion.filesystem import get_file_format
-from facefusion.types import AudioEncoder, Command, CommandSet, Duration, Fps, StreamMode, VideoEncoder, VideoPreset
+from facefusion.types import AudioEncoder, ColorSpace, ColorTransfer, Command, CommandSet, Duration, Fps, StreamMode, VideoEncoder, VideoFormat, VideoPreset
 
 
 def run(commands : List[Command]) -> List[Command]:
@@ -51,6 +51,10 @@ def set_input_fps(input_fps : Fps) -> List[Command]:
 	return [ '-r', str(input_fps) ]
 
 
+def set_start_number(frame_number : int) -> List[Command]:
+	return [ '-start_number', str(frame_number) ]
+
+
 def set_output(output_path : str) -> List[Command]:
 	return [ output_path ]
 
@@ -77,6 +81,14 @@ def set_stream_quality(stream_quality : int) -> List[Command]:
 
 def unsafe_concat() -> List[Command]:
 	return [ '-f', 'concat', '-safe', '0' ]
+
+
+def seek_to(time : float) -> List[Command]:
+	return [ '-ss', str(time)]
+
+
+def set_output_format(output_format : str) -> List[Command]:
+	return [ '-f', output_format ]
 
 
 def enforce_pixel_format(pixel_format : str) -> List[Command]:
@@ -106,7 +118,17 @@ def select_frame_range(frame_start : int, frame_end : int, video_fps : Fps) -> L
 
 
 def prevent_frame_drop() -> List[Command]:
-	return [ '-vsync', '0' ]
+	return [ '-fps_mode', 'passthrough' ]
+
+
+def restrict_color_transfer(color_transfer : ColorTransfer) -> List[Command]:
+	if color_transfer in [ 'smpte2084', 'arib-std-b67' ]:
+		return [ '-vf', 'scale=out_primaries=bt709:out_transfer=bt709:intent=perceptual' ]
+	return []
+
+
+def convert_color_space(color_space : ColorSpace) -> List[Command]:
+	return [ '-vf', 'scale=out_color_matrix=' + color_space + ':out_range=tv,setparams=colorspace=' + color_space + ':color_primaries=' + color_space + ':color_trc=' + color_space ]
 
 
 def select_media_range(frame_start : int, frame_end : int, media_fps : Fps) -> List[Command]:
@@ -179,12 +201,28 @@ def set_audio_volume(audio_volume : int) -> List[Command]:
 	return [ '-filter:a', 'volume=' + str(audio_volume / 100) ]
 
 
+def set_thread_count(thread_count : int) -> List[Command]:
+	return [ '-threads', str(thread_count) ]
+
+
 def set_video_encoder(video_encoder : str) -> List[Command]:
 	return [ '-c:v', video_encoder ]
 
 
 def copy_video_encoder() -> List[Command]:
 	return set_video_encoder('copy')
+
+
+def set_faststart(video_format : VideoFormat) -> List[Command]:
+	if video_format in [ 'm4v', 'mov', 'mp4' ]:
+		return [ '-movflags', '+faststart' ]
+	return []
+
+
+def set_video_tag(video_encoder : VideoEncoder, video_format : VideoFormat) -> List[Command]:
+	if video_format in [ 'm4v', 'mov', 'mp4' ] and video_encoder in [ 'libx265', 'hevc_nvenc', 'hevc_amf', 'hevc_qsv', 'hevc_videotoolbox' ]:
+		return [ '-tag:v', 'hvc1' ]
+	return []
 
 
 def set_video_quality(video_encoder : VideoEncoder, video_quality : int) -> List[Command]:
