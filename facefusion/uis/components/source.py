@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 import time
@@ -19,6 +20,7 @@ SOURCE_IMAGE : Optional[gradio.Image] = None
 SOURCE_GALLERY : Optional[gradio.Gallery] = None
 LIBRARY_GALLERY : Optional[gradio.Gallery] = None
 SAVE_LIBRARY_BUTTON : Optional[gradio.Button] = None
+CLEAR_LIBRARY_BUTTON : Optional[gradio.Button] = None
 REMOVE_LIBRARY_BUTTON : Optional[gradio.Button] = None
 REFRESH_LIBRARY_BUTTON : Optional[gradio.Button] = None
 
@@ -56,6 +58,7 @@ def render() -> None:
 	global SOURCE_GALLERY
 	global LIBRARY_GALLERY
 	global SAVE_LIBRARY_BUTTON
+	global CLEAR_LIBRARY_BUTTON
 	global REMOVE_LIBRARY_BUTTON
 	global REFRESH_LIBRARY_BUTTON
 	global CURRENT_UPLOAD_PATHS
@@ -81,8 +84,8 @@ def render() -> None:
 
 	# Uploaded faces gallery (placed above preview)
 	SOURCE_GALLERY = gradio.Gallery(
-		value = CURRENT_UPLOAD_PATHS if len(CURRENT_UPLOAD_PATHS) > 1 else None,
-		visible = len(CURRENT_UPLOAD_PATHS) > 1,
+		value = CURRENT_UPLOAD_PATHS if len(CURRENT_UPLOAD_PATHS) > 0 else None,
+		visible = len(CURRENT_UPLOAD_PATHS) > 0,
 		columns = 5,
 		height = 'auto',
 		allow_preview = False,
@@ -109,6 +112,7 @@ def render() -> None:
 	with gradio.Accordion('📁 Saved Faces Library', open = bool(CURRENT_LIBRARY_PATHS)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
 			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			CLEAR_LIBRARY_BUTTON = gradio.Button('❌ Clear', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
 			REMOVE_LIBRARY_BUTTON = gradio.Button('🗑️ Remove', size = 'sm', variant = 'stop', min_width = 0, scale = 1)
 			REFRESH_LIBRARY_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		LIBRARY_GALLERY = gradio.Gallery(
@@ -134,6 +138,7 @@ def listen() -> None:
 	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	SAVE_LIBRARY_BUTTON.click(save_to_library, outputs = [ LIBRARY_GALLERY ])
+	CLEAR_LIBRARY_BUTTON.click(clear_face_preview, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	REMOVE_LIBRARY_BUTTON.click(remove_from_library, outputs = [ LIBRARY_GALLERY, SOURCE_IMAGE ])
 	REFRESH_LIBRARY_BUTTON.click(refresh_library, outputs = [ LIBRARY_GALLERY ])
 
@@ -151,11 +156,17 @@ def update(files : List[File]) -> Tuple[gradio.Audio, gradio.Image, gradio.Galle
 		source_audio_path = get_first(filter_audio_paths(file_names))
 		source_image_path = get_first(image_paths)
 		state_manager.set_item('source_paths', [ source_image_path ] if source_image_path else file_names)
-		gallery_update = gradio.Gallery(value = image_paths if len(image_paths) > 1 else None, visible = len(image_paths) > 1)
+		gallery_update = gradio.Gallery(value = image_paths if len(image_paths) > 0 else None, visible = len(image_paths) > 0)
 		return gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False)
 
 	state_manager.clear_item('source_paths')
 	return gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
+
+
+def clear_face_preview() -> Tuple[gradio.Image, gradio.Accordion]:
+	clear_faces()
+	state_manager.clear_item('source_paths')
+	return gradio.Image(value = None, visible = False), gradio.Accordion(open = True)
 
 
 def select_uploaded_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion]:
@@ -183,7 +194,7 @@ def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image]:
 	source_paths = state_manager.get_item('source_paths')
 	if source_paths:
 		first_path = get_first(filter_image_paths(source_paths))
-		if first_path and os.path.exists(first_path) and first_path.startswith(SOURCES_DIR):
+		if first_path and os.path.exists(first_path) and os.path.abspath(first_path).startswith(os.path.abspath(SOURCES_DIR)):
 			remove_file(first_path)
 			clear_faces()
 	CURRENT_LIBRARY_PATHS = get_library_paths()
@@ -195,15 +206,36 @@ def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image]:
 	return gradio.Gallery(value = None), gradio.Image(value = None, visible = False)
 
 
+def get_file_hash(file_path : str) -> Optional[str]:
+	if file_path and os.path.isfile(file_path):
+		hasher = hashlib.sha256()
+		with open(file_path, 'rb') as f:
+			for chunk in iter(lambda: f.read(65536), b''):
+				hasher.update(chunk)
+		return hasher.hexdigest()
+	return None
+
+
 def save_to_library() -> gradio.Gallery:
 	global CURRENT_LIBRARY_PATHS
 	source_paths = state_manager.get_item('source_paths')
 	if source_paths:
 		first_path = get_first(filter_image_paths(source_paths))
 		if first_path and os.path.exists(first_path):
+			CURRENT_LIBRARY_PATHS = get_library_paths()
+			if os.path.abspath(first_path).startswith(os.path.abspath(SOURCES_DIR)):
+				gradio.Info('Image is already in the saved library.')
+				return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
+			new_hash = get_file_hash(first_path)
+			if new_hash:
+				for existing_path in CURRENT_LIBRARY_PATHS:
+					if get_file_hash(existing_path) == new_hash:
+						gradio.Info('Duplicate image already exists in library.')
+						return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
 			ext = os.path.splitext(first_path)[1] or '.png'
 			dst = os.path.join(SOURCES_DIR, f"face_{int(time.time())}{ext}")
 			shutil.copy2(first_path, dst)
+			gradio.Info('Face successfully saved to library.')
 	CURRENT_LIBRARY_PATHS = get_library_paths()
 	return gradio.Gallery(value = CURRENT_LIBRARY_PATHS)
 

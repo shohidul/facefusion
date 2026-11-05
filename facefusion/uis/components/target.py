@@ -1,3 +1,4 @@
+import hashlib
 import os
 import shutil
 import time
@@ -8,7 +9,7 @@ import gradio
 from facefusion import state_manager, translator
 from facefusion.common_helper import get_first
 from facefusion.face_store import clear_faces
-from facefusion.filesystem import is_image, is_video, resolve_file_paths
+from facefusion.filesystem import is_image, is_video, remove_file, resolve_file_paths
 from facefusion.uis.core import register_ui_component
 from facefusion.uis.types import ComponentOptions, File
 
@@ -19,6 +20,8 @@ TARGET_VIDEO : Optional[gradio.Video] = None
 TARGET_GALLERY : Optional[gradio.Gallery] = None
 TARGET_LIBRARY_GALLERY : Optional[gradio.Gallery] = None
 SAVE_TARGET_BUTTON : Optional[gradio.Button] = None
+CLEAR_TARGET_BUTTON : Optional[gradio.Button] = None
+REMOVE_TARGET_BUTTON : Optional[gradio.Button] = None
 REFRESH_TARGET_BUTTON : Optional[gradio.Button] = None
 
 TARGETS_DIR = os.path.join(os.getcwd(), 'data', 'targets')
@@ -56,6 +59,8 @@ def render() -> None:
 	global TARGET_GALLERY
 	global TARGET_LIBRARY_GALLERY
 	global SAVE_TARGET_BUTTON
+	global CLEAR_TARGET_BUTTON
+	global REMOVE_TARGET_BUTTON
 	global REFRESH_TARGET_BUTTON
 	global CURRENT_TARGET_UPLOADS
 	global CURRENT_TARGET_LIBRARY
@@ -73,13 +78,13 @@ def render() -> None:
 			elem_classes = [ 'compact-file-upload' ]
 		)
 
-	target_file_names = [ f.get('path') for f in TARGET_FILE.value ] if TARGET_FILE.value else []
+	target_file_names = [ f.get('path') if isinstance(f, dict) else f for f in TARGET_FILE.value ] if TARGET_FILE.value else []
 	CURRENT_TARGET_UPLOADS = target_file_names
 
 	# Uploaded target gallery (placed above preview)
 	TARGET_GALLERY = gradio.Gallery(
-		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 1 else None,
-		visible = len(CURRENT_TARGET_UPLOADS) > 1,
+		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 0 else None,
+		visible = len(CURRENT_TARGET_UPLOADS) > 0,
 		columns = 5,
 		height = 'auto',
 		allow_preview = False,
@@ -116,6 +121,8 @@ def render() -> None:
 	with gradio.Accordion('📁 Saved Targets Library', open = bool(CURRENT_TARGET_LIBRARY)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
 			SAVE_TARGET_BUTTON = gradio.Button('💾 Save', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			CLEAR_TARGET_BUTTON = gradio.Button('❌ Clear', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			REMOVE_TARGET_BUTTON = gradio.Button('🗑️ Remove', size = 'sm', variant = 'stop', min_width = 0, scale = 1)
 			REFRESH_TARGET_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		TARGET_LIBRARY_GALLERY = gradio.Gallery(
 			value = CURRENT_TARGET_LIBRARY if CURRENT_TARGET_LIBRARY else None,
@@ -140,6 +147,8 @@ def listen() -> None:
 	TARGET_GALLERY.select(select_uploaded_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
 	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
 	SAVE_TARGET_BUTTON.click(save_to_library, outputs = [ TARGET_LIBRARY_GALLERY ])
+	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
+	REMOVE_TARGET_BUTTON.click(remove_from_library, outputs = [ TARGET_LIBRARY_GALLERY, TARGET_IMAGE, TARGET_VIDEO ])
 	REFRESH_TARGET_BUTTON.click(refresh_library, outputs = [ TARGET_LIBRARY_GALLERY ])
 
 
@@ -151,7 +160,7 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 
 	if file_names:
 		first_file = file_names[0]
-		gallery_update = gradio.Gallery(value = file_names if len(file_names) > 1 else None, visible = len(file_names) > 1)
+		gallery_update = gradio.Gallery(value = file_names if len(file_names) > 0 else None, visible = len(file_names) > 0)
 
 		if is_image(first_file):
 			state_manager.set_item('target_path', first_file)
@@ -163,6 +172,12 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 
 	state_manager.clear_item('target_path')
 	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
+
+
+def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
+	clear_faces()
+	state_manager.clear_item('target_path')
+	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True)
 
 
 def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
@@ -191,13 +206,52 @@ def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio
 	return gradio.Image(), gradio.Video(), gradio.Accordion()
 
 
+def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image, gradio.Video]:
+	global CURRENT_TARGET_LIBRARY
+	target_path = state_manager.get_item('target_path')
+	if target_path and os.path.exists(target_path) and os.path.abspath(target_path).startswith(os.path.abspath(TARGETS_DIR)):
+		remove_file(target_path)
+		clear_faces()
+	CURRENT_TARGET_LIBRARY = get_target_library_paths()
+	if CURRENT_TARGET_LIBRARY:
+		new_first = CURRENT_TARGET_LIBRARY[0]
+		state_manager.set_item('target_path', new_first)
+		if is_image(new_first):
+			return gradio.Gallery(value = CURRENT_TARGET_LIBRARY), gradio.Image(value = new_first, visible = True), gradio.Video(value = None, visible = False)
+		if is_video(new_first):
+			return gradio.Gallery(value = CURRENT_TARGET_LIBRARY), gradio.Image(value = None, visible = False), gradio.Video(value = new_first, visible = True)
+	state_manager.clear_item('target_path')
+	return gradio.Gallery(value = None), gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False)
+
+
+def get_file_hash(file_path : str) -> Optional[str]:
+	if file_path and os.path.isfile(file_path):
+		hasher = hashlib.sha256()
+		with open(file_path, 'rb') as f:
+			for chunk in iter(lambda: f.read(65536), b''):
+				hasher.update(chunk)
+		return hasher.hexdigest()
+	return None
+
+
 def save_to_library() -> gradio.Gallery:
 	global CURRENT_TARGET_LIBRARY
 	target_path = state_manager.get_item('target_path')
 	if target_path and os.path.exists(target_path):
+		CURRENT_TARGET_LIBRARY = get_target_library_paths()
+		if os.path.abspath(target_path).startswith(os.path.abspath(TARGETS_DIR)):
+			gradio.Info('Target is already in the saved library.')
+			return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
+		new_hash = get_file_hash(target_path)
+		if new_hash:
+			for existing_path in CURRENT_TARGET_LIBRARY:
+				if get_file_hash(existing_path) == new_hash:
+					gradio.Info('Duplicate target already exists in library.')
+					return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
 		ext = os.path.splitext(target_path)[1] or '.png'
 		dst = os.path.join(TARGETS_DIR, f"target_{int(time.time())}{ext}")
 		shutil.copy2(target_path, dst)
+		gradio.Info('Target successfully saved to library.')
 	CURRENT_TARGET_LIBRARY = get_target_library_paths()
 	return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
 
