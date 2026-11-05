@@ -115,9 +115,13 @@ def listen() -> None:
 		REFERENCE_FACE_POSITION_GALLERY.select(update_reference_frame_number, inputs = preview_frame_slider)
 	REFERENCE_FACE_POSITION_GALLERY.select(update_reference_face_position, outputs = [ save_btn ] if save_btn else None)
 
+	source_image = get_ui_component('source_image')
+	if source_image:
+		source_image.change(source_change_update_reference_gallery, outputs = REFERENCE_FACE_POSITION_GALLERY)
+		source_image.clear(source_change_update_reference_gallery, outputs = REFERENCE_FACE_POSITION_GALLERY)
+
 	for ui_component in get_ui_components(
 	[
-		'source_image',
 		'target_image',
 		'target_video'
 	]):
@@ -193,10 +197,19 @@ def clear_reference_face_position() -> None:
 	current_target_path = state_manager.get_item('target_path')
 	current_source_paths = state_manager.get_item('source_paths')
 	first_source = current_source_paths[0] if current_source_paths else None
-	if current_target_path != LAST_TARGET_PATH or first_source != LAST_SOURCE_PATH:
-		LAST_TARGET_PATH = current_target_path
-		LAST_SOURCE_PATH = first_source
+	target_changed = current_target_path != LAST_TARGET_PATH
+	source_changed = first_source != LAST_SOURCE_PATH
+	LAST_TARGET_PATH = current_target_path
+	LAST_SOURCE_PATH = first_source
+	if target_changed or (source_changed and state_manager.get_item('face_selector_gender') == 'auto'):
 		state_manager.set_item('reference_face_position', 0)
+
+
+def source_change_update_reference_gallery() -> gradio.Gallery:
+	if state_manager.get_item('face_selector_gender') == 'auto':
+		clear_reference_face_position()
+		return update_reference_position_gallery()
+	return gradio.Gallery()
 
 
 def update_reference_face_distance(reference_face_distance : float) -> None:

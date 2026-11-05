@@ -142,11 +142,13 @@ def render() -> None:
 
 
 def get_reference_gallery_update() -> gradio.Gallery:
-	try:
-		from facefusion.uis.components.face_selector import update_reference_position_gallery
-		return update_reference_position_gallery()
-	except Exception:
-		return gradio.Gallery()
+	if state_manager.get_item('face_selector_gender') == 'auto':
+		try:
+			from facefusion.uis.components.face_selector import update_reference_position_gallery
+			return update_reference_position_gallery()
+		except Exception:
+			return gradio.Gallery()
+	return gradio.Gallery()
 
 
 def listen() -> None:
@@ -188,7 +190,8 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 		source_audio_path = get_first(filter_audio_paths(file_names))
 		source_image_path = get_first(image_paths)
 		state_manager.set_item('source_paths', [ source_image_path ] if source_image_path else file_names)
-		state_manager.set_item('reference_face_position', 0)
+		if state_manager.get_item('face_selector_gender') == 'auto':
+			state_manager.set_item('reference_face_position', 0)
 		gallery_update = gradio.Gallery(value = image_paths if len(image_paths) > 0 else None, visible = len(image_paths) > 0)
 		return gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False), get_reference_gallery_update(), reset_btn
 
@@ -215,7 +218,8 @@ def select_uploaded_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
 	selected_path = extract_selected_path(evt, CURRENT_UPLOAD_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		state_manager.set_item('reference_face_position', 0)
+		if state_manager.get_item('face_selector_gender') == 'auto':
+			state_manager.set_item('reference_face_position', 0)
 		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
 	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
 
@@ -232,7 +236,8 @@ def select_library_face(evt : gradio.SelectData) -> Tuple[Any, ...]:
 	selected_path = extract_selected_path(evt, CURRENT_LIBRARY_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		state_manager.set_item('reference_face_position', 0)
+		if state_manager.get_item('face_selector_gender') == 'auto':
+			state_manager.set_item('reference_face_position', 0)
 		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
 	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), get_reference_gallery_update(), reset_btn
 
