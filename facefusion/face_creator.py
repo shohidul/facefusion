@@ -65,7 +65,7 @@ def create_faces(vision_frame : VisionFrame, bounding_boxes : List[BoundingBox],
 
 def get_one_face(faces : List[Face], position : int = 0) -> Optional[Face]:
 	if faces:
-		position = min(position, len(faces) - 1)
+		position = min(position or 0, len(faces) - 1)
 		return faces[position]
 	return None
 

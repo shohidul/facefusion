@@ -75,7 +75,9 @@ def render() -> None:
 
 	preview_image_options : ComponentOptions =\
 	{
-		'label': translator.get('uis.preview_image')
+		'label': translator.get('uis.preview_image'),
+		'show_download_button': True,
+		'interactive': False
 	}
 
 	source_vision_frames = read_static_images(state_manager.get_item('source_paths'))
@@ -103,14 +105,13 @@ def render() -> None:
 		preview_image_options['elem_classes'] = [ 'image-preview', 'is-' + detect_frame_orientation(preview_vision_frame) ]
 		preview_image_options['visible'] = True
 
-	with gradio.Group(elem_classes = [ 'preview-sticky-wrap' ]):
-		PREVIEW_IMAGE = gradio.Image(**preview_image_options)
-		SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
-			'💾 Save Preview to Target (Replace on Disk)',
-			size = 'sm',
-			variant = 'primary',
-			elem_classes = [ 'save-preview-button' ]
-		)
+	PREVIEW_IMAGE = gradio.Image(**preview_image_options)
+	SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
+		'💾 Save Preview to Target (Replace on Disk)',
+		size = 'sm',
+		variant = 'primary',
+		elem_classes = [ 'save-preview-button' ]
+	)
 	register_ui_component('preview_image', PREVIEW_IMAGE)
 	register_ui_component('save_preview_to_target_button', SAVE_PREVIEW_TO_TARGET_BUTTON)
 
@@ -152,7 +153,7 @@ def listen() -> None:
 		outputs = [ target_image, PREVIEW_IMAGE ]
 		if reference_face_position_gallery:
 			outputs.append(reference_face_position_gallery)
-		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, inputs = [ PREVIEW_IMAGE ], outputs = outputs)
+		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, outputs = outputs)
 
 	for ui_component in get_ui_components(
 	[
@@ -466,7 +467,7 @@ def resolve_real_target_path(target_path : str) -> str:
 	return real_path
 
 
-def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> Any:
+def save_preview_to_target() -> Any:
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	def fallback() -> Tuple[Any, ...]:
@@ -514,12 +515,6 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> An
 		)
 	except Exception as exception:
 		logger.error(f'Process preview frame failed: {exception}', __name__)
-
-	if not is_vision_frame(saved_vision_frame) and isinstance(preview_image, numpy.ndarray):
-		if preview_image.ndim == 3 and preview_image.shape[2] == 4:
-			saved_vision_frame = cv2.cvtColor(preview_image, cv2.COLOR_RGBA2BGRA)
-		elif preview_image.ndim == 3 and preview_image.shape[2] == 3:
-			saved_vision_frame = cv2.cvtColor(preview_image, cv2.COLOR_RGB2BGR)
 
 	if is_vision_frame(saved_vision_frame):
 		if saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4 and target_path.lower().endswith(('.jpg', '.jpeg')):

@@ -29,7 +29,7 @@ def select_faces(reference_vision_frame : VisionFrame, source_vision_frames : Li
 	if state_manager.get_item('face_selector_mode') == 'reference':
 		reference_faces = get_static_faces([ reference_vision_frame ])
 		reference_faces = sort_and_filter_faces(source_faces, reference_faces)
-		reference_face = get_one_face(reference_faces, state_manager.get_item('reference_face_position'))
+		reference_face = get_one_face(reference_faces, state_manager.get_item('reference_face_position') or 0)
 
 		if reference_face:
 			match_faces = find_match_faces([ reference_face ], target_faces, state_manager.get_item('reference_face_distance'))

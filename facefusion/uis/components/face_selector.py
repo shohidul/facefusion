@@ -186,7 +186,7 @@ def clear_reference_face_position() -> None:
 	current_target_path = state_manager.get_item('target_path')
 	if current_target_path != LAST_TARGET_PATH:
 		LAST_TARGET_PATH = current_target_path
-		state_manager.clear_item('reference_face_position')
+		state_manager.set_item('reference_face_position', 0)
 
 
 def update_reference_face_distance(reference_face_distance : float) -> None:
