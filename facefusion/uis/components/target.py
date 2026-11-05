@@ -85,10 +85,7 @@ def render() -> None:
 	if is_target_video:
 		target_video_options['value'] = active_target
 		target_video_options['visible'] = True
-	TARGET_IMAGE = gradio.Image(**target_image_options)
-	TARGET_VIDEO = gradio.Video(**target_video_options)
-
-	# Uploaded target gallery
+	# Uploaded target gallery (placed above preview)
 	TARGET_GALLERY = gradio.Gallery(
 		label = 'Uploaded Targets (Click to Select)',
 		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 1 else None,
@@ -103,6 +100,9 @@ def render() -> None:
 		type = 'filepath',
 		elem_classes = [ 'compact-gallery' ]
 	)
+
+	TARGET_IMAGE = gradio.Image(**target_image_options)
+	TARGET_VIDEO = gradio.Video(**target_video_options)
 
 	# Saved Targets Library
 	CURRENT_TARGET_LIBRARY = get_target_library_paths()

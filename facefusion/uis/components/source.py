@@ -68,17 +68,7 @@ def render() -> None:
 	source_image_path = get_first(filter_image_paths(source_file_names))
 	CURRENT_UPLOAD_PATHS = filter_image_paths(source_file_names) if source_file_names else []
 
-	SOURCE_AUDIO = gradio.Audio(
-		value = source_audio_path if has_source_audio else None,
-		visible = has_source_audio,
-		show_label = False
-	)
-	SOURCE_IMAGE = gradio.Image(
-		value = source_image_path if has_source_image else None,
-		visible = has_source_image,
-		show_label = False
-	)
-
+	# Uploaded faces gallery (placed above preview)
 	SOURCE_GALLERY = gradio.Gallery(
 		label = 'Uploaded Faces (Click to Select)',
 		value = CURRENT_UPLOAD_PATHS if len(CURRENT_UPLOAD_PATHS) > 1 else None,
@@ -92,6 +82,17 @@ def render() -> None:
 		object_fit = 'cover',
 		type = 'filepath',
 		elem_classes = [ 'compact-gallery' ]
+	)
+
+	SOURCE_AUDIO = gradio.Audio(
+		value = source_audio_path if has_source_audio else None,
+		visible = has_source_audio,
+		show_label = False
+	)
+	SOURCE_IMAGE = gradio.Image(
+		value = source_image_path if has_source_image else None,
+		visible = has_source_image,
+		show_label = False
 	)
 
 	CURRENT_LIBRARY_PATHS = get_library_paths()
