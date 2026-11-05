@@ -232,11 +232,29 @@
 	object-fit: cover;
 }
 
-:root:root:root:root .image-preview.is-landscape
+:root:root:root:root .preview-group
+{
+	border: unset !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+
+:root:root:root:root .preview-group.is-landscape,
+:root:root:root:root .preview-group:has(.image-preview.is-landscape)
 {
 	position: sticky;
 	top: 0;
 	z-index: 100;
+	background: var(--background-fill-primary, #ffffff);
+	padding-bottom: 4px;
+}
+
+:root:root:root:root .dark .preview-group.is-landscape,
+:root:root:root:root .dark .preview-group:has(.image-preview.is-landscape)
+{
+	background: var(--background-fill-primary, #0b0f19);
 }
 
 :root:root:root:root .block .error

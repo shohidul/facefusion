@@ -105,13 +105,14 @@ def render() -> None:
 		preview_image_options['elem_classes'] = [ 'image-preview', 'is-' + detect_frame_orientation(preview_vision_frame) ]
 		preview_image_options['visible'] = True
 
-	PREVIEW_IMAGE = gradio.Image(**preview_image_options)
-	SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
-		'💾 Save Preview to Target (Replace on Disk)',
-		size = 'sm',
-		variant = 'primary',
-		elem_classes = [ 'save-preview-button' ]
-	)
+	with gradio.Group(elem_classes = [ 'preview-group' ]):
+		PREVIEW_IMAGE = gradio.Image(**preview_image_options)
+		SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
+			'💾 Save Preview to Target (Replace on Disk)',
+			size = 'sm',
+			variant = 'primary',
+			elem_classes = [ 'save-preview-button' ]
+		)
 	register_ui_component('preview_image', PREVIEW_IMAGE)
 	register_ui_component('save_preview_to_target_button', SAVE_PREVIEW_TO_TARGET_BUTTON)
 
@@ -132,8 +133,8 @@ def listen() -> None:
 		preview_frame_slider.change(update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE, show_progress = 'hidden', trigger_mode = 'once')
 
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
-	if reference_face_position_gallery:
-		reference_face_position_gallery.select(select_reference_face_and_update_preview, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+	if reference_face_position_gallery and SAVE_PREVIEW_TO_TARGET_BUTTON:
+		reference_face_position_gallery.select(select_reference_face_and_update_preview, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = [ PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ])
 
 	for ui_component in get_ui_components(
 	[
@@ -150,7 +151,7 @@ def listen() -> None:
 		target_image.clear(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
-		outputs = [ target_image, PREVIEW_IMAGE ]
+		outputs = [ target_image, PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ]
 		if reference_face_position_gallery:
 			outputs.append(reference_face_position_gallery)
 		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, outputs = outputs)
@@ -302,10 +303,10 @@ def target_change_preview_update(preview_mode : PreviewMode, preview_resolution 
 	return update_preview_image(preview_mode, preview_resolution, frame_number)
 
 
-def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Tuple[gradio.Image, gradio.Button]:
 	clear_hold_preview_frame()
 	clear_faces()
-	return update_preview_image(preview_mode, preview_resolution, frame_number)
+	return update_preview_image(preview_mode, preview_resolution, frame_number), gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 
 
 def preview_mode_change_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
@@ -471,7 +472,7 @@ def save_preview_to_target() -> Any:
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	def fallback() -> Tuple[Any, ...]:
-		fails = [ gradio.Image(), gradio.Image() ]
+		fails = [ gradio.Image(), gradio.Image(), gradio.Button(value = '❌ Failed to Save (Check Target)') ]
 		if reference_face_position_gallery:
 			fails.append(gradio.Gallery())
 		return tuple(fails)
@@ -530,10 +531,11 @@ def save_preview_to_target() -> Any:
 		if written_real or written_temp:
 			read_static_image.cache_clear()
 			clear_faces()
+			target_filename = os.path.basename(real_target_path) if (written_real and real_target_path) else os.path.basename(target_path)
 			if written_real:
-				gradio.Info(f'Target replaced on disk:\n{real_target_path}', duration = 2)
+				save_btn_out = gradio.Button(value = f'✅ Saved & Replaced: {target_filename}', variant = 'primary')
 			else:
-				gradio.Warning(f'Replaced target in cache only (real disk file not found):\n{target_path}', duration = 3)
+				save_btn_out = gradio.Button(value = f'⚠️ Replaced in Cache Only: {target_filename}', variant = 'primary')
 
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
 			set_hold_preview_frame(display_frame)
@@ -541,7 +543,7 @@ def save_preview_to_target() -> Any:
 			target_img_out = gradio.Image(value = display_frame, visible = True)
 			preview_img_out = gradio.Image(value = display_frame, visible = True, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(saved_vision_frame) ])
 
-			success_results = [ target_img_out, preview_img_out ]
+			success_results = [ target_img_out, preview_img_out, save_btn_out ]
 			if reference_face_position_gallery:
 				try:
 					from facefusion.uis.components.face_selector import update_reference_position_gallery
@@ -551,7 +553,6 @@ def save_preview_to_target() -> Any:
 					success_results.append(gradio.Gallery())
 			return tuple(success_results)
 		else:
-			gradio.Error(f'Failed to write to {target_path}', duration = 2)
 			return fallback()
 
 	gradio.Error('Failed to process output image.', duration = 2)
