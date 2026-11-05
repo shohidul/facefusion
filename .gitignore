@@ -5,3 +5,7 @@ __pycache__
 .idea
 .jobs
 .vscode
+data/sources/*
+!data/sources/.gitkeep
+data/targets/*
+!data/targets/.gitkeep

@@ -1,29 +1,73 @@
-from typing import Optional, Tuple
+import os
+import shutil
+import time
+from typing import Any, List, Optional, Tuple
 
 import gradio
 
 from facefusion import state_manager, translator
+from facefusion.common_helper import get_first
 from facefusion.face_store import clear_faces
-from facefusion.filesystem import is_image, is_video
+from facefusion.filesystem import is_image, is_video, resolve_file_paths
 from facefusion.uis.core import register_ui_component
 from facefusion.uis.types import ComponentOptions, File
 
 TARGET_FILE : Optional[gradio.File] = None
 TARGET_IMAGE : Optional[gradio.Image] = None
 TARGET_VIDEO : Optional[gradio.Video] = None
+TARGET_GALLERY : Optional[gradio.Gallery] = None
+TARGET_LIBRARY_GALLERY : Optional[gradio.Gallery] = None
+SAVE_TARGET_BUTTON : Optional[gradio.Button] = None
+REFRESH_TARGET_BUTTON : Optional[gradio.Button] = None
+
+TARGETS_DIR = os.path.join(os.getcwd(), 'data', 'targets')
+CURRENT_TARGET_UPLOADS : List[str] = []
+CURRENT_TARGET_LIBRARY : List[str] = []
+
+
+def get_target_library_paths() -> List[str]:
+	os.makedirs(TARGETS_DIR, exist_ok = True)
+	all_paths = resolve_file_paths(TARGETS_DIR)
+	return [ p for p in all_paths if is_image(p) or is_video(p) ]
+
+
+def extract_selected_path(evt : gradio.SelectData, items : List[str]) -> Optional[str]:
+	if evt and isinstance(evt.index, int) and 0 <= evt.index < len(items):
+		return items[evt.index]
+	if evt and isinstance(evt.value, str) and os.path.exists(evt.value):
+		return evt.value
+	if evt and isinstance(evt.value, dict):
+		val = evt.value.get('image', {})
+		if isinstance(val, dict) and 'path' in val and os.path.exists(val['path']):
+			return val['path']
+		if isinstance(val, str) and os.path.exists(val):
+			return val
+		if 'path' in evt.value and os.path.exists(evt.value['path']):
+			return evt.value['path']
+	return None
 
 
 def render() -> None:
 	global TARGET_FILE
 	global TARGET_IMAGE
 	global TARGET_VIDEO
+	global TARGET_GALLERY
+	global TARGET_LIBRARY_GALLERY
+	global SAVE_TARGET_BUTTON
+	global REFRESH_TARGET_BUTTON
+	global CURRENT_TARGET_UPLOADS
+	global CURRENT_TARGET_LIBRARY
 
 	is_target_image = is_image(state_manager.get_item('target_path'))
 	is_target_video = is_video(state_manager.get_item('target_path'))
 	TARGET_FILE = gradio.File(
 		label = translator.get('uis.target_file'),
-		value = state_manager.get_item('target_path') if is_target_image or is_target_video else None
+		file_count = 'multiple',
+		value = [ state_manager.get_item('target_path') ] if is_target_image or is_target_video else None
 	)
+	target_file_names = [ f.get('path') for f in TARGET_FILE.value ] if TARGET_FILE.value else []
+	CURRENT_TARGET_UPLOADS = target_file_names
+
 	target_image_options : ComponentOptions =\
 	{
 		'show_label': False,
@@ -34,32 +78,122 @@ def render() -> None:
 		'show_label': False,
 		'visible': False
 	}
+	active_target = state_manager.get_item('target_path')
 	if is_target_image:
-		target_image_options['value'] = TARGET_FILE.value.get('path')
+		target_image_options['value'] = active_target
 		target_image_options['visible'] = True
 	if is_target_video:
-		target_video_options['value'] = TARGET_FILE.value.get('path')
+		target_video_options['value'] = active_target
 		target_video_options['visible'] = True
 	TARGET_IMAGE = gradio.Image(**target_image_options)
 	TARGET_VIDEO = gradio.Video(**target_video_options)
+
+	# Uploaded target gallery
+	TARGET_GALLERY = gradio.Gallery(
+		label = 'Uploaded Targets (Click to Select)',
+		value = CURRENT_TARGET_UPLOADS if len(CURRENT_TARGET_UPLOADS) > 1 else None,
+		visible = len(CURRENT_TARGET_UPLOADS) > 1,
+		columns = 4,
+		height = 'auto',
+		allow_preview = False,
+		preview = False,
+		show_download_button = False,
+		show_fullscreen_button = False,
+		object_fit = 'cover',
+		type = 'filepath'
+	)
+
+	# Saved Targets Library
+	CURRENT_TARGET_LIBRARY = get_target_library_paths()
+	with gradio.Accordion('📁 Saved Targets Library', open = bool(CURRENT_TARGET_LIBRARY)):
+		with gradio.Row():
+			SAVE_TARGET_BUTTON = gradio.Button('💾 Save Active Target', size = 'sm', variant = 'secondary')
+			REFRESH_TARGET_BUTTON = gradio.Button('🔄 Refresh', size = 'sm')
+		TARGET_LIBRARY_GALLERY = gradio.Gallery(
+			value = CURRENT_TARGET_LIBRARY if CURRENT_TARGET_LIBRARY else None,
+			columns = 4,
+			height = 'auto',
+			allow_preview = False,
+			preview = False,
+			show_label = False,
+			show_download_button = False,
+			show_fullscreen_button = False,
+			object_fit = 'cover',
+			type = 'filepath'
+		)
+
 	register_ui_component('target_image', TARGET_IMAGE)
 	register_ui_component('target_video', TARGET_VIDEO)
 
 
 def listen() -> None:
-	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = [ TARGET_IMAGE, TARGET_VIDEO ])
+	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_GALLERY ])
+	TARGET_GALLERY.select(select_uploaded_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO ])
+	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO ])
+	SAVE_TARGET_BUTTON.click(save_to_library, outputs = [ TARGET_LIBRARY_GALLERY ])
+	REFRESH_TARGET_BUTTON.click(refresh_library, outputs = [ TARGET_LIBRARY_GALLERY ])
 
 
-def update(file : File) -> Tuple[gradio.Image, gradio.Video]:
+def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Gallery]:
+	global CURRENT_TARGET_UPLOADS
 	clear_faces()
+	file_names = [ file.name for file in files ] if files else []
+	CURRENT_TARGET_UPLOADS = file_names
 
-	if file and is_image(file.name):
-		state_manager.set_item('target_path', file.name)
-		return gradio.Image(value = file.name, visible = True), gradio.Video(value = None, visible = False)
+	if file_names:
+		first_file = file_names[0]
+		gallery_update = gradio.Gallery(value = file_names if len(file_names) > 1 else None, visible = len(file_names) > 1)
 
-	if file and is_video(file.name):
-		state_manager.set_item('target_path', file.name)
-		return gradio.Image(value = None, visible = False), gradio.Video(value = file.name, visible = True)
+		if is_image(first_file):
+			state_manager.set_item('target_path', first_file)
+			return gradio.Image(value = first_file, visible = True), gradio.Video(value = None, visible = False), gallery_update
+
+		if is_video(first_file):
+			state_manager.set_item('target_path', first_file)
+			return gradio.Image(value = None, visible = False), gradio.Video(value = first_file, visible = True), gallery_update
 
 	state_manager.clear_item('target_path')
-	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False)
+	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False)
+
+
+def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video]:
+	global CURRENT_TARGET_UPLOADS
+	clear_faces()
+	selected_path = extract_selected_path(evt, CURRENT_TARGET_UPLOADS)
+	if selected_path and os.path.exists(selected_path):
+		state_manager.set_item('target_path', selected_path)
+		if is_image(selected_path):
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False)
+		if is_video(selected_path):
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True)
+	return gradio.Image(), gradio.Video()
+
+
+def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video]:
+	global CURRENT_TARGET_LIBRARY
+	clear_faces()
+	selected_path = extract_selected_path(evt, CURRENT_TARGET_LIBRARY)
+	if selected_path and os.path.exists(selected_path):
+		state_manager.set_item('target_path', selected_path)
+		if is_image(selected_path):
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False)
+		if is_video(selected_path):
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True)
+	return gradio.Image(), gradio.Video()
+
+
+def save_to_library() -> gradio.Gallery:
+	global CURRENT_TARGET_LIBRARY
+	target_path = state_manager.get_item('target_path')
+	if target_path and os.path.exists(target_path):
+		ext = os.path.splitext(target_path)[1] or '.png'
+		dst = os.path.join(TARGETS_DIR, f"target_{int(time.time())}{ext}")
+		shutil.copy2(target_path, dst)
+	CURRENT_TARGET_LIBRARY = get_target_library_paths()
+	return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
+
+
+def refresh_library() -> gradio.Gallery:
+	global CURRENT_TARGET_LIBRARY
+	CURRENT_TARGET_LIBRARY = get_target_library_paths()
+	return gradio.Gallery(value = CURRENT_TARGET_LIBRARY)
