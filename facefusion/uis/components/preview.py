@@ -1,4 +1,6 @@
 import os
+import shutil
+import subprocess
 from time import sleep
 from typing import List, Optional, Tuple
 
@@ -322,6 +324,62 @@ def prepare_output_frame(target_vision_frame : VisionFrame, temp_vision_frame : 
 	return temp_vision_frame
 
 
+def resolve_real_target_path(target_path : str) -> str:
+	if not target_path or not os.path.exists(target_path):
+		return target_path
+
+	norm_path = os.path.abspath(target_path)
+	is_temp = any(seg in norm_path.lower() for seg in [
+		'/gradio/',
+		'/tmpdir/',
+		'/tmp/',
+		'/temp/',
+		'/var/folders/',
+		'appdata/local/temp'
+	])
+	if not is_temp:
+		return target_path
+
+	filename = os.path.basename(target_path)
+	target_size = os.path.getsize(target_path)
+
+	# 1. macOS Spotlight search using mdfind
+	if shutil.which('mdfind'):
+		try:
+			cmd = [ 'mdfind', f'kMDItemFSName == "{filename}"' ]
+			proc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, text = True, timeout = 3)
+			if proc.returncode == 0:
+				matches = [ line.strip() for line in proc.stdout.splitlines() if line.strip() ]
+				real_matches = [
+					m for m in matches
+					if os.path.isfile(m) and not any(t in m.lower() for t in [ '/gradio/', '/tmpdir/', '/tmp/', '/var/folders/' ])
+				]
+				size_matches = [ m for m in real_matches if os.path.getsize(m) == target_size ]
+				if size_matches:
+					return size_matches[0]
+				if real_matches:
+					return real_matches[0]
+		except Exception:
+			pass
+
+	# 2. Check common user locations
+	home = os.path.expanduser('~')
+	common_dirs = [
+		os.path.join(home, 'Downloads'),
+		os.path.join(home, 'Desktop'),
+		os.path.join(home, 'Pictures'),
+		os.path.join(home, 'Documents'),
+		'/Volumes'
+	]
+	for cdir in common_dirs:
+		if os.path.exists(cdir):
+			direct_file = os.path.join(cdir, filename)
+			if os.path.isfile(direct_file) and os.path.getsize(direct_file) == target_size:
+				return direct_file
+
+	return target_path
+
+
 def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gradio.Image:
 	target_path = state_manager.get_item('target_path')
 	if not target_path or not is_image(target_path):
@@ -365,9 +423,18 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gr
 	if is_vision_frame(saved_vision_frame):
 		if saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4 and target_path.lower().endswith(('.jpg', '.jpeg')):
 			saved_vision_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2BGR)
-		if write_image(target_path, saved_vision_frame):
+
+		real_target_path = resolve_real_target_path(target_path)
+		written_real = False
+		if real_target_path and os.path.exists(real_target_path) and os.path.abspath(real_target_path) != os.path.abspath(target_path):
+			written_real = write_image(real_target_path, saved_vision_frame)
+
+		written_temp = write_image(target_path, saved_vision_frame)
+
+		if written_real or written_temp:
 			clear_faces()
-			gradio.Info(f'Target replaced on disk: {os.path.basename(target_path)}')
+			saved_location = real_target_path if (written_real and real_target_path) else target_path
+			gradio.Info(f'Target replaced on disk:\n{saved_location}')
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
 			return gradio.Image(value = display_frame, visible = True)
 		else:

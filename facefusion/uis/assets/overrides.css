@@ -107,15 +107,17 @@
 :root:root:root:root .toast-body
 {
 	background: white;
-	color: var(--primary-500);
+	color: var(--neutral-800);
 	border: unset;
-	border-radius: unset;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 :root:root:root:root .dark .toast-body
 {
 	background: var(--neutral-900);
-	color: var(--primary-600);
+	color: var(--neutral-100);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 :root:root:root:root .toast-icon,
@@ -123,12 +125,82 @@
 :root:root:root:root .toast-text,
 :root:root:root:root .toast-close
 {
-	color: unset;
+	color: inherit;
 }
 
 :root:root:root:root .toast-body .timer
 {
 	background: currentColor;
+}
+
+:root:root:root:root .toast-body.info,
+:root:root:root:root .toast-body.info .toast-icon,
+:root:root:root:root .toast-body.info .toast-title,
+:root:root:root:root .toast-body.info .toast-text,
+:root:root:root:root .toast-body.info .toast-close
+{
+	color: #0284c7 !important;
+}
+
+:root:root:root:root .toast-body.info .timer
+{
+	background: #0284c7 !important;
+}
+
+:root:root:root:root .dark .toast-body.info,
+:root:root:root:root .dark .toast-body.info .toast-icon,
+:root:root:root:root .dark .toast-body.info .toast-title,
+:root:root:root:root .dark .toast-body.info .toast-text,
+:root:root:root:root .dark .toast-body.info .toast-close
+{
+	color: #38bdf8 !important;
+}
+
+:root:root:root:root .dark .toast-body.info .timer
+{
+	background: #38bdf8 !important;
+}
+
+:root:root:root:root .toast-body.success,
+:root:root:root:root .toast-body.success .toast-icon,
+:root:root:root:root .toast-body.success .toast-title,
+:root:root:root:root .toast-body.success .toast-text,
+:root:root:root:root .toast-body.success .toast-close
+{
+	color: #16a34a !important;
+}
+
+:root:root:root:root .toast-body.success .timer
+{
+	background: #16a34a !important;
+}
+
+:root:root:root:root .toast-body.warning,
+:root:root:root:root .toast-body.warning .toast-icon,
+:root:root:root:root .toast-body.warning .toast-title,
+:root:root:root:root .toast-body.warning .toast-text,
+:root:root:root:root .toast-body.warning .toast-close
+{
+	color: #d97706 !important;
+}
+
+:root:root:root:root .toast-body.warning .timer
+{
+	background: #d97706 !important;
+}
+
+:root:root:root:root .toast-body.error,
+:root:root:root:root .toast-body.error .toast-icon,
+:root:root:root:root .toast-body.error .toast-title,
+:root:root:root:root .toast-body.error .toast-text,
+:root:root:root:root .toast-body.error .toast-close
+{
+	color: var(--primary-500) !important;
+}
+
+:root:root:root:root .toast-body.error .timer
+{
+	background: var(--primary-500) !important;
 }
 
 :root:root:root:root .slider_input_container .min_value,
