@@ -146,10 +146,10 @@ def render() -> None:
 
 def listen() -> None:
 	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_GALLERY, TARGET_FILE_ACCORDION ])
-	TARGET_GALLERY.select(select_uploaded_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
-	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
+	TARGET_GALLERY.select(select_uploaded_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
+	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
 	SAVE_TARGET_BUTTON.click(save_to_library, outputs = [ TARGET_LIBRARY_GALLERY ])
-	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION ])
+	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
 	REMOVE_TARGET_BUTTON.click(remove_from_library, outputs = [ TARGET_LIBRARY_GALLERY, TARGET_IMAGE, TARGET_VIDEO ])
 	REFRESH_TARGET_BUTTON.click(refresh_library, outputs = [ TARGET_LIBRARY_GALLERY ])
 
@@ -191,7 +191,7 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
 
 
-def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
+def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	clear_faces()
 	try:
 		from facefusion.uis.components.preview import clear_hold_preview_frame
@@ -199,10 +199,10 @@ def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion
 	except Exception:
 		pass
 	state_manager.clear_item('target_path')
-	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True)
+	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
-def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
+def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	global CURRENT_TARGET_UPLOADS
 	clear_faces()
 	try:
@@ -219,13 +219,13 @@ def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradi
 				register_original_target_frame(selected_path)
 			except Exception:
 				pass
-			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False)
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 		if is_video(selected_path):
-			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False)
-	return gradio.Image(), gradio.Video(), gradio.Accordion()
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
-def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion]:
+def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	global CURRENT_TARGET_LIBRARY
 	clear_faces()
 	try:
@@ -242,10 +242,10 @@ def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio
 				register_original_target_frame(selected_path)
 			except Exception:
 				pass
-			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False)
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 		if is_video(selected_path):
-			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False)
-	return gradio.Image(), gradio.Video(), gradio.Accordion()
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
 def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image, gradio.Video]:

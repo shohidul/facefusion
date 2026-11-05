@@ -136,10 +136,10 @@ def render() -> None:
 
 def listen() -> None:
 	SOURCE_FILE.change(update, inputs = SOURCE_FILE, outputs = [ SOURCE_AUDIO, SOURCE_IMAGE, SOURCE_GALLERY, SOURCE_FILE_ACCORDION ])
-	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
-	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
+	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION, SOURCE_GALLERY, LIBRARY_GALLERY ])
+	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION, SOURCE_GALLERY, LIBRARY_GALLERY ])
 	SAVE_LIBRARY_BUTTON.click(save_to_library, outputs = [ LIBRARY_GALLERY ])
-	CLEAR_LIBRARY_BUTTON.click(clear_face_preview, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
+	CLEAR_LIBRARY_BUTTON.click(clear_face_preview, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION, SOURCE_GALLERY, LIBRARY_GALLERY ])
 	REMOVE_LIBRARY_BUTTON.click(remove_from_library, outputs = [ LIBRARY_GALLERY, SOURCE_IMAGE ])
 	REFRESH_LIBRARY_BUTTON.click(refresh_library, outputs = [ LIBRARY_GALLERY ])
 
@@ -164,30 +164,40 @@ def update(files : List[File]) -> Tuple[gradio.Audio, gradio.Image, gradio.Galle
 	return gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
 
 
-def clear_face_preview() -> Tuple[gradio.Image, gradio.Accordion]:
+def clear_face_preview() -> Tuple[gradio.Image, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	clear_faces()
 	state_manager.clear_item('source_paths')
-	return gradio.Image(value = None, visible = False), gradio.Accordion(open = True)
+	return gradio.Image(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
-def select_uploaded_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion]:
+def select_uploaded_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	global CURRENT_UPLOAD_PATHS
 	clear_faces()
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	selected_path = extract_selected_path(evt, CURRENT_UPLOAD_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False)
-	return gradio.Image(), gradio.Accordion()
+		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
-def select_library_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion]:
+def select_library_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
 	global CURRENT_LIBRARY_PATHS
 	clear_faces()
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	selected_path = extract_selected_path(evt, CURRENT_LIBRARY_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False)
-	return gradio.Image(), gradio.Accordion()
+		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+	return gradio.Image(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
 
 
 def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image]:
