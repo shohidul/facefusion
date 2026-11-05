@@ -95,9 +95,9 @@ def render() -> None:
 
 	CURRENT_LIBRARY_PATHS = get_library_paths()
 	with gradio.Accordion('📁 Saved Faces Library', open = bool(CURRENT_LIBRARY_PATHS)):
-		with gradio.Row():
-			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save Active Face', size = 'sm', variant = 'secondary')
-			REFRESH_LIBRARY_BUTTON = gradio.Button('🔄 Refresh', size = 'sm')
+		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
+			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save Active Face', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			REFRESH_LIBRARY_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		LIBRARY_GALLERY = gradio.Gallery(
 			value = CURRENT_LIBRARY_PATHS if CURRENT_LIBRARY_PATHS else None,
 			columns = 4,

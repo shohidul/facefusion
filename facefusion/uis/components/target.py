@@ -106,9 +106,9 @@ def render() -> None:
 	# Saved Targets Library
 	CURRENT_TARGET_LIBRARY = get_target_library_paths()
 	with gradio.Accordion('📁 Saved Targets Library', open = bool(CURRENT_TARGET_LIBRARY)):
-		with gradio.Row():
-			SAVE_TARGET_BUTTON = gradio.Button('💾 Save Active Target', size = 'sm', variant = 'secondary')
-			REFRESH_TARGET_BUTTON = gradio.Button('🔄 Refresh', size = 'sm')
+		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
+			SAVE_TARGET_BUTTON = gradio.Button('💾 Save Active Target', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			REFRESH_TARGET_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		TARGET_LIBRARY_GALLERY = gradio.Gallery(
 			value = CURRENT_TARGET_LIBRARY if CURRENT_TARGET_LIBRARY else None,
 			columns = 4,
