@@ -110,9 +110,10 @@ def listen() -> None:
 	REFERENCE_FACE_DISTANCE_SLIDER.release(update_reference_face_distance, inputs = REFERENCE_FACE_DISTANCE_SLIDER)
 
 	preview_frame_slider = get_ui_component('preview_frame_slider')
+	save_btn = get_ui_component('save_preview_to_target_button')
 	if preview_frame_slider:
 		REFERENCE_FACE_POSITION_GALLERY.select(update_reference_frame_number, inputs = preview_frame_slider)
-		REFERENCE_FACE_POSITION_GALLERY.select(update_reference_face_position)
+	REFERENCE_FACE_POSITION_GALLERY.select(update_reference_face_position, outputs = [ save_btn ] if save_btn else None)
 
 	for ui_component in get_ui_components(
 	[
@@ -175,8 +176,12 @@ def update_face_selector_age_range(face_selector_age_range : Tuple[float, float]
 	return update_reference_position_gallery()
 
 
-def update_reference_face_position(event : gradio.SelectData) -> None:
+def update_reference_face_position(event : gradio.SelectData) -> Optional[gradio.Button]:
 	state_manager.set_item('reference_face_position', event.index)
+	save_btn = get_ui_component('save_preview_to_target_button')
+	if save_btn:
+		return gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	return None
 
 
 LAST_SOURCE_PATH : Optional[str] = None

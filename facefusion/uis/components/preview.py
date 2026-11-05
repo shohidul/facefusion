@@ -136,6 +136,10 @@ def listen() -> None:
 	if reference_face_position_gallery and SAVE_PREVIEW_TO_TARGET_BUTTON:
 		reference_face_position_gallery.select(select_reference_face_and_update_preview, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = [ PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ])
 
+	preview_outputs = [ PREVIEW_IMAGE ]
+	if SAVE_PREVIEW_TO_TARGET_BUTTON:
+		preview_outputs.append(SAVE_PREVIEW_TO_TARGET_BUTTON)
+
 	for ui_component in get_ui_components(
 	[
 		'source_audio',
@@ -143,7 +147,7 @@ def listen() -> None:
 		'target_video'
 	]):
 		for method in [ 'change', 'clear' ]:
-			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = preview_outputs)
 
 	target_image = get_ui_component('target_image')
 	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
@@ -241,7 +245,7 @@ def listen() -> None:
 		'face_parser_model_dropdown',
 		'voice_extractor_model_dropdown'
 	]):
-		ui_component.change(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+		ui_component.change(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = preview_outputs)
 
 	for ui_component in get_ui_components(
 	[
@@ -249,7 +253,7 @@ def listen() -> None:
 		'face_detector_score_slider',
 		'face_landmarker_score_slider'
 	]):
-		ui_component.release(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
+		ui_component.release(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = preview_outputs)
 
 
 def update_preview_image(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
@@ -313,7 +317,7 @@ def target_clear_preview_update(preview_mode : PreviewMode, preview_resolution :
 	return update_preview_image(preview_mode, preview_resolution, frame_number), gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 
 
-def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Tuple[gradio.Image, gradio.Button]:
+def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0, *args : Any, **kwargs : Any) -> Tuple[gradio.Image, gradio.Button]:
 	clear_hold_preview_frame()
 	clear_faces()
 	return update_preview_image(preview_mode, preview_resolution, frame_number), gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
@@ -325,9 +329,12 @@ def preview_mode_change_and_update_preview(preview_mode : PreviewMode, preview_r
 	return update_preview_image(preview_mode, preview_resolution, frame_number)
 
 
-def clear_and_update_preview_image(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+def clear_and_update_preview_image(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0, *args : Any, **kwargs : Any) -> Any:
 	clear_faces()
-	return update_preview_image(preview_mode, preview_resolution, frame_number)
+	img = update_preview_image(preview_mode, preview_resolution, frame_number)
+	if SAVE_PREVIEW_TO_TARGET_BUTTON:
+		return img, gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	return img
 
 
 def process_preview_frame(reference_vision_frame : VisionFrame, source_vision_frames : List[VisionFrame], source_audio_frame : AudioFrame, source_voice_frame : AudioFrame, target_vision_frames : List[VisionFrame], preview_mode : PreviewMode, preview_resolution : str) -> VisionFrame:
