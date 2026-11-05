@@ -85,8 +85,13 @@ def create_inference_session(model_path : str, inference_providers : List[Infere
 		return inference_session
 
 	except Exception:
-		logger.error(translator.get('loading_model_failed').format(model_name = model_file_name), __name__)
-		fatal_exit(1)
+		try:
+			inference_session = InferenceSession(model_path, providers = [ 'CPUExecutionProvider' ])
+			logger.debug(translator.get('loading_model_succeeded').format(model_name = model_file_name, seconds = calculate_end_time(start_time)), __name__)
+			return inference_session
+		except Exception:
+			logger.error(translator.get('loading_model_failed').format(model_name = model_file_name), __name__)
+			fatal_exit(1)
 
 
 def get_inference_context(module_name : str, model_names : List[str], execution_device_id : int, execution_providers : List[ExecutionProvider]) -> str:
