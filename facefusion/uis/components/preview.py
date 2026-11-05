@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 from time import sleep
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import cv2
 import gradio
@@ -101,8 +101,19 @@ def listen() -> None:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	target_image = get_ui_component('target_image')
+	source_image = get_ui_component('source_image')
+	source_file_accordion = get_ui_component('source_file_accordion')
+	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
+
 	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
-		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, inputs = [ PREVIEW_IMAGE ], outputs = [ target_image ])
+		outputs = [ target_image, PREVIEW_IMAGE ]
+		if source_image:
+			outputs.append(source_image)
+		if source_file_accordion:
+			outputs.append(source_file_accordion)
+		if reference_face_position_gallery:
+			outputs.append(reference_face_position_gallery)
+		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, inputs = [ PREVIEW_IMAGE ], outputs = outputs)
 
 	for ui_component in get_ui_components(
 	[
@@ -380,11 +391,25 @@ def resolve_real_target_path(target_path : str) -> str:
 	return target_path
 
 
-def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gradio.Image:
+def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> Any:
+	source_image = get_ui_component('source_image')
+	source_file_accordion = get_ui_component('source_file_accordion')
+	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
+
+	def fallback() -> Tuple[Any, ...]:
+		fails = [ gradio.Image(), gradio.Image() ]
+		if source_image:
+			fails.append(gradio.Image())
+		if source_file_accordion:
+			fails.append(gradio.Accordion())
+		if reference_face_position_gallery:
+			fails.append(gradio.Gallery())
+		return tuple(fails)
+
 	target_path = state_manager.get_item('target_path')
 	if not target_path or not is_image(target_path):
 		gradio.Warning('No active target image selected or target is a video.')
-		return gradio.Image()
+		return fallback()
 
 	source_vision_frames = read_static_images(state_manager.get_item('source_paths'))
 	source_audio_frame = create_empty_audio_frame()
@@ -395,7 +420,7 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gr
 
 	if not is_vision_frame(target_vision_frame) or not is_vision_frame(reference_vision_frame):
 		gradio.Warning('Could not read target image from disk.')
-		return gradio.Image()
+		return fallback()
 
 	height, width = target_vision_frame.shape[:2]
 	target_resolution = f'{width}x{height}'
@@ -433,14 +458,35 @@ def save_preview_to_target(preview_image : Optional[numpy.ndarray] = None) -> gr
 
 		if written_real or written_temp:
 			clear_faces()
+			state_manager.clear_item('source_paths')
+			state_manager.set_item('reference_face_position', 0)
 			saved_location = real_target_path if (written_real and real_target_path) else target_path
 			gradio.Info(f'Target replaced on disk:\n{saved_location}')
+
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
-			return gradio.Image(value = display_frame, visible = True)
+
+			target_img_out = gradio.Image(value = display_frame, visible = True)
+			preview_img_out = gradio.Image(value = display_frame, visible = True, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(saved_vision_frame) ])
+			source_img_out = gradio.Image(value = None, visible = False)
+			source_acc_out = gradio.Accordion(open = True)
+
+			success_results = [ target_img_out, preview_img_out ]
+			if source_image:
+				success_results.append(source_img_out)
+			if source_file_accordion:
+				success_results.append(source_acc_out)
+			if reference_face_position_gallery:
+				try:
+					from facefusion.uis.components.face_selector import update_reference_position_gallery
+					success_results.append(update_reference_position_gallery())
+				except Exception as ref_err:
+					logger.error(f'Failed to update reference gallery: {ref_err}', __name__)
+					success_results.append(gradio.Gallery())
+			return tuple(success_results)
 		else:
 			gradio.Error(f'Failed to write to {target_path}')
-			return gradio.Image()
+			return fallback()
 
 	gradio.Error('Failed to process output image.')
-	return gradio.Image()
+	return fallback()
 

@@ -131,6 +131,7 @@ def render() -> None:
 
 	register_ui_component('source_audio', SOURCE_AUDIO)
 	register_ui_component('source_image', SOURCE_IMAGE)
+	register_ui_component('source_file_accordion', SOURCE_FILE_ACCORDION)
 
 
 def listen() -> None:
