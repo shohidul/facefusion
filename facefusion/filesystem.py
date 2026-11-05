@@ -208,12 +208,26 @@ def resolve_real_file_path(file_path : str) -> str:
 		return file_path
 
 	filename = os.path.basename(file_path)
+
+	# 1. Check active output_path directory first
+	try:
+		from facefusion import state_manager
+		output_path = state_manager.get_item('output_path')
+		if output_path:
+			out_str = str(output_path)
+			if os.path.isdir(out_str):
+				direct_candidate = os.path.join(out_str, filename)
+				if os.path.isfile(direct_candidate):
+					return direct_candidate
+	except Exception:
+		pass
+
 	try:
 		target_size = os.path.getsize(file_path)
 	except Exception:
 		target_size = 0
 
-	# 1. macOS Spotlight search using mdfind
+	# 2. macOS Spotlight search using mdfind
 	mdfind_bin = shutil.which('mdfind') or '/usr/bin/mdfind'
 	if os.path.exists(mdfind_bin):
 		queries = [
@@ -244,40 +258,27 @@ def resolve_real_file_path(file_path : str) -> str:
 			except Exception:
 				pass
 
-	# 2. Filesystem search for common user directories and mounted volumes
-	search_roots = []
-	home = os.path.expanduser('~')
-	for user_folder in [ 'Downloads', 'Desktop', 'Pictures', 'Documents', 'Movies' ]:
-		folder_path = os.path.join(home, user_folder)
-		if os.path.isdir(folder_path):
-			search_roots.append(folder_path)
-
+	# 3. Check mounted volumes if needed
 	if os.path.exists('/Volumes'):
 		try:
 			for vol in os.listdir('/Volumes'):
 				vol_path = os.path.join('/Volumes', vol)
 				if os.path.isdir(vol_path) and not vol.startswith('.'):
-					search_roots.append(vol_path)
+					direct = os.path.join(vol_path, filename)
+					if os.path.isfile(direct):
+						return direct
+
+					for root, dirs, files in os.walk(vol_path):
+						depth = root[len(vol_path):].count(os.sep)
+						if depth > 4:
+							dirs.clear()
+							continue
+						if filename in files:
+							candidate = os.path.join(root, filename)
+							if os.path.isfile(candidate):
+								return candidate
 		except Exception:
 			pass
-
-	for sroot in search_roots:
-		try:
-			direct = os.path.join(sroot, filename)
-			if os.path.isfile(direct):
-				return direct
-
-			for root, dirs, files in os.walk(sroot):
-				depth = root[len(sroot):].count(os.sep)
-				if depth > 4:
-					dirs.clear()
-					continue
-				if filename in files:
-					candidate = os.path.join(root, filename)
-					if os.path.isfile(candidate):
-						return candidate
-		except Exception:
-			continue
 
 	return file_path
 

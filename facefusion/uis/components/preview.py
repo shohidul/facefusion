@@ -340,6 +340,20 @@ def resolve_real_target_path(target_path : str) -> str:
 		return target_path
 
 	filename = os.path.basename(target_path)
+
+	# 1. Directly check OUTPUT PATH (the active working/saving directory)
+	try:
+		output_path = state_manager.get_item('output_path')
+		if output_path:
+			out_str = str(output_path)
+			if os.path.isdir(out_str):
+				direct_candidate = os.path.join(out_str, filename)
+				if os.path.isfile(direct_candidate):
+					return direct_candidate
+	except Exception:
+		pass
+
+	# 2. Check TARGET_ORIGIN_MAP cache
 	try:
 		from facefusion.uis.components.target import TARGET_ORIGIN_MAP
 		if target_path in TARGET_ORIGIN_MAP:
