@@ -8,7 +8,7 @@ import gradio
 from facefusion import state_manager, translator
 from facefusion.common_helper import get_first
 from facefusion.face_store import clear_faces
-from facefusion.filesystem import filter_audio_paths, filter_image_paths, has_audio, has_image, resolve_file_paths
+from facefusion.filesystem import filter_audio_paths, filter_image_paths, has_audio, has_image, remove_file, resolve_file_paths
 from facefusion.uis.core import register_ui_component
 from facefusion.uis.types import File
 
@@ -19,6 +19,7 @@ SOURCE_IMAGE : Optional[gradio.Image] = None
 SOURCE_GALLERY : Optional[gradio.Gallery] = None
 LIBRARY_GALLERY : Optional[gradio.Gallery] = None
 SAVE_LIBRARY_BUTTON : Optional[gradio.Button] = None
+REMOVE_LIBRARY_BUTTON : Optional[gradio.Button] = None
 REFRESH_LIBRARY_BUTTON : Optional[gradio.Button] = None
 
 SOURCES_DIR = os.path.join(os.getcwd(), 'data', 'sources')
@@ -55,6 +56,7 @@ def render() -> None:
 	global SOURCE_GALLERY
 	global LIBRARY_GALLERY
 	global SAVE_LIBRARY_BUTTON
+	global REMOVE_LIBRARY_BUTTON
 	global REFRESH_LIBRARY_BUTTON
 	global CURRENT_UPLOAD_PATHS
 	global CURRENT_LIBRARY_PATHS
@@ -106,7 +108,8 @@ def render() -> None:
 
 	with gradio.Accordion('📁 Saved Faces Library', open = bool(CURRENT_LIBRARY_PATHS)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
-			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save Active Face', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
+			REMOVE_LIBRARY_BUTTON = gradio.Button('🗑️ Remove', size = 'sm', variant = 'stop', min_width = 0, scale = 1)
 			REFRESH_LIBRARY_BUTTON = gradio.Button('🔄 Refresh', size = 'sm', min_width = 0, scale = 1)
 		LIBRARY_GALLERY = gradio.Gallery(
 			value = CURRENT_LIBRARY_PATHS if CURRENT_LIBRARY_PATHS else None,
@@ -131,6 +134,7 @@ def listen() -> None:
 	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	SAVE_LIBRARY_BUTTON.click(save_to_library, outputs = [ LIBRARY_GALLERY ])
+	REMOVE_LIBRARY_BUTTON.click(remove_from_library, outputs = [ LIBRARY_GALLERY, SOURCE_IMAGE ])
 	REFRESH_LIBRARY_BUTTON.click(refresh_library, outputs = [ LIBRARY_GALLERY ])
 
 
@@ -172,6 +176,23 @@ def select_library_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.A
 		state_manager.set_item('source_paths', [ selected_path ])
 		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False)
 	return gradio.Image(), gradio.Accordion()
+
+
+def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image]:
+	global CURRENT_LIBRARY_PATHS
+	source_paths = state_manager.get_item('source_paths')
+	if source_paths:
+		first_path = get_first(filter_image_paths(source_paths))
+		if first_path and os.path.exists(first_path) and first_path.startswith(SOURCES_DIR):
+			remove_file(first_path)
+			clear_faces()
+	CURRENT_LIBRARY_PATHS = get_library_paths()
+	if CURRENT_LIBRARY_PATHS:
+		new_first = CURRENT_LIBRARY_PATHS[0]
+		state_manager.set_item('source_paths', [ new_first ])
+		return gradio.Gallery(value = CURRENT_LIBRARY_PATHS), gradio.Image(value = new_first, visible = True)
+	state_manager.clear_item('source_paths')
+	return gradio.Gallery(value = None), gradio.Image(value = None, visible = False)
 
 
 def save_to_library() -> gradio.Gallery:
