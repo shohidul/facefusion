@@ -10,7 +10,7 @@ from facefusion import state_manager, translator
 from facefusion.common_helper import get_first
 from facefusion.face_store import clear_faces
 from facefusion.filesystem import is_image, is_video, remove_file, resolve_file_paths, resolve_real_file_path
-from facefusion.uis.core import register_ui_component
+from facefusion.uis.core import get_ui_component, register_ui_component
 from facefusion.uis.types import ComponentOptions, File
 
 TARGET_FILE_ACCORDION : Optional[gradio.Accordion] = None
@@ -152,20 +152,29 @@ def render() -> None:
 
 
 def listen() -> None:
-	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_GALLERY, TARGET_FILE_ACCORDION ])
-	TARGET_GALLERY.select(select_uploaded_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
-	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
+	save_btn = get_ui_component('save_preview_to_target_button')
+	gallery_outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ]
+	if save_btn:
+		gallery_outputs.append(save_btn)
+	update_outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_GALLERY, TARGET_FILE_ACCORDION ]
+	if save_btn:
+		update_outputs.append(save_btn)
+
+	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = update_outputs)
+	TARGET_GALLERY.select(select_uploaded_target, outputs = gallery_outputs)
+	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = gallery_outputs)
 	SAVE_TARGET_BUTTON.click(save_to_library, outputs = [ TARGET_LIBRARY_GALLERY ])
-	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ])
+	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = gallery_outputs)
 	REMOVE_TARGET_BUTTON.click(remove_from_library, outputs = [ TARGET_LIBRARY_GALLERY, TARGET_IMAGE, TARGET_VIDEO ])
 	REFRESH_TARGET_BUTTON.click(refresh_library, outputs = [ TARGET_LIBRARY_GALLERY ])
 
 
-def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Gallery, gradio.Accordion]:
+def update(files : List[File]) -> Tuple[Any, ...]:
 	global CURRENT_TARGET_UPLOADS, TARGET_ORIGIN_MAP
 	clear_faces()
 	file_names = [ file.name for file in files ] if files else []
 	CURRENT_TARGET_UPLOADS = file_names
+	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 
 	if file_names:
 		for fn in file_names:
@@ -188,17 +197,17 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 				register_original_target_frame(first_file)
 			except Exception:
 				pass
-			return gradio.Image(value = first_file, visible = True), gradio.Video(value = None, visible = False), gallery_update, gradio.Accordion(open = False)
+			return gradio.Image(value = first_file, visible = True), gradio.Video(value = None, visible = False), gallery_update, gradio.Accordion(open = False), reset_btn
 
 		if is_video(first_file):
 			state_manager.set_item('target_path', first_file)
-			return gradio.Image(value = None, visible = False), gradio.Video(value = first_file, visible = True), gallery_update, gradio.Accordion(open = False)
+			return gradio.Image(value = None, visible = False), gradio.Video(value = first_file, visible = True), gallery_update, gradio.Accordion(open = False), reset_btn
 
 	state_manager.clear_item('target_path')
-	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
+	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), reset_btn
 
 
-def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
+def clear_target_preview() -> Tuple[Any, ...]:
 	clear_faces()
 	try:
 		from facefusion.uis.components.preview import clear_hold_preview_frame
@@ -206,10 +215,11 @@ def clear_target_preview() -> Tuple[gradio.Image, gradio.Video, gradio.Accordion
 	except Exception:
 		pass
 	state_manager.clear_item('target_path')
-	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
+	return gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
 
 
-def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
+def select_uploaded_target(evt : gradio.SelectData) -> Tuple[Any, ...]:
 	global CURRENT_TARGET_UPLOADS
 	clear_faces()
 	try:
@@ -217,6 +227,7 @@ def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradi
 		clear_hold_preview_frame()
 	except Exception:
 		pass
+	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 	selected_path = extract_selected_path(evt, CURRENT_TARGET_UPLOADS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
@@ -226,13 +237,13 @@ def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradi
 				register_original_target_frame(selected_path)
 			except Exception:
 				pass
-			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
 		if is_video(selected_path):
-			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
-	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
+	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
 
 
-def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Video, gradio.Accordion, gradio.Gallery, gradio.Gallery]:
+def select_library_target(evt : gradio.SelectData) -> Tuple[Any, ...]:
 	global CURRENT_TARGET_LIBRARY
 	clear_faces()
 	try:
@@ -240,6 +251,7 @@ def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio
 		clear_hold_preview_frame()
 	except Exception:
 		pass
+	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 	selected_path = extract_selected_path(evt, CURRENT_TARGET_LIBRARY)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
@@ -249,10 +261,10 @@ def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio
 				register_original_target_frame(selected_path)
 			except Exception:
 				pass
-			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
 		if is_video(selected_path):
-			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
-	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None)
+			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
+	return gradio.Image(), gradio.Video(), gradio.Accordion(), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), reset_btn
 
 
 def remove_from_library() -> Tuple[gradio.Gallery, gradio.Image, gradio.Video]:

@@ -146,7 +146,10 @@ def listen() -> None:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
 	target_image = get_ui_component('target_image')
-	if target_image:
+	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
+		target_image.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = [ PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ])
+		target_image.clear(target_clear_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = [ PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ])
+	elif target_image:
 		target_image.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 		target_image.clear(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
@@ -295,12 +298,19 @@ def set_hold_preview_frame(frame : VisionFrame) -> None:
 	HOLD_PREVIEW_FRAME = frame.copy()
 
 
-def target_change_preview_update(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> gradio.Image:
+def target_change_preview_update(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Tuple[gradio.Image, gradio.Button]:
 	global HOLD_PREVIEW_FRAME
+	reset_btn = gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 	if HOLD_PREVIEW_FRAME is not None:
-		return gradio.Image(value = HOLD_PREVIEW_FRAME, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(HOLD_PREVIEW_FRAME) ])
+		return gradio.Image(value = HOLD_PREVIEW_FRAME, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(HOLD_PREVIEW_FRAME) ]), reset_btn
 	clear_faces()
-	return update_preview_image(preview_mode, preview_resolution, frame_number)
+	return update_preview_image(preview_mode, preview_resolution, frame_number), reset_btn
+
+
+def target_clear_preview_update(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Tuple[gradio.Image, gradio.Button]:
+	clear_faces()
+	clear_hold_preview_frame()
+	return update_preview_image(preview_mode, preview_resolution, frame_number), gradio.Button(value = '💾 Save Preview to Target (Replace on Disk)')
 
 
 def select_reference_face_and_update_preview(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Tuple[gradio.Image, gradio.Button]:
