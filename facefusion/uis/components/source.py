@@ -7,10 +7,12 @@ import gradio
 
 from facefusion import state_manager, translator
 from facefusion.common_helper import get_first
+from facefusion.face_store import clear_faces
 from facefusion.filesystem import filter_audio_paths, filter_image_paths, has_audio, has_image, resolve_file_paths
 from facefusion.uis.core import register_ui_component
 from facefusion.uis.types import File
 
+SOURCE_FILE_ACCORDION : Optional[gradio.Accordion] = None
 SOURCE_FILE : Optional[gradio.File] = None
 SOURCE_AUDIO : Optional[gradio.Audio] = None
 SOURCE_IMAGE : Optional[gradio.Image] = None
@@ -46,6 +48,7 @@ def extract_selected_path(evt : gradio.SelectData, items : List[str]) -> Optiona
 
 
 def render() -> None:
+	global SOURCE_FILE_ACCORDION
 	global SOURCE_FILE
 	global SOURCE_AUDIO
 	global SOURCE_IMAGE
@@ -56,17 +59,23 @@ def render() -> None:
 	global CURRENT_UPLOAD_PATHS
 	global CURRENT_LIBRARY_PATHS
 
+	CURRENT_LIBRARY_PATHS = get_library_paths()
 	has_source_audio = has_audio(state_manager.get_item('source_paths'))
 	has_source_image = has_image(state_manager.get_item('source_paths'))
-	SOURCE_FILE = gradio.File(
-		label = translator.get('uis.source_file'),
-		file_count = 'multiple',
-		value = state_manager.get_item('source_paths') if has_source_audio or has_source_image else None
-	)
-	source_file_names = [ source_file_value.get('path') for source_file_value in SOURCE_FILE.value ] if SOURCE_FILE.value else None
+
+	source_file_names = state_manager.get_item('source_paths') if (has_source_audio or has_source_image) else []
 	source_audio_path = get_first(filter_audio_paths(source_file_names))
 	source_image_path = get_first(filter_image_paths(source_file_names))
 	CURRENT_UPLOAD_PATHS = filter_image_paths(source_file_names) if source_file_names else []
+
+	# Collapsible upload box (collapses if library or active face exists)
+	with gradio.Accordion('📤 Upload Source File', open = not bool(source_image_path or CURRENT_LIBRARY_PATHS)) as SOURCE_FILE_ACCORDION:
+		SOURCE_FILE = gradio.File(
+			label = translator.get('uis.source_file'),
+			file_count = 'multiple',
+			value = source_file_names if source_file_names else None,
+			elem_classes = [ 'compact-file-upload' ]
+		)
 
 	# Uploaded faces gallery (placed above preview)
 	SOURCE_GALLERY = gradio.Gallery(
@@ -95,7 +104,6 @@ def render() -> None:
 		show_label = False
 	)
 
-	CURRENT_LIBRARY_PATHS = get_library_paths()
 	with gradio.Accordion('📁 Saved Faces Library', open = bool(CURRENT_LIBRARY_PATHS)):
 		with gradio.Row(elem_classes = [ 'library-actions-row' ]):
 			SAVE_LIBRARY_BUTTON = gradio.Button('💾 Save Active Face', size = 'sm', variant = 'secondary', min_width = 0, scale = 1)
@@ -119,15 +127,16 @@ def render() -> None:
 
 
 def listen() -> None:
-	SOURCE_FILE.change(update, inputs = SOURCE_FILE, outputs = [ SOURCE_AUDIO, SOURCE_IMAGE, SOURCE_GALLERY ])
-	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE ])
-	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE ])
+	SOURCE_FILE.change(update, inputs = SOURCE_FILE, outputs = [ SOURCE_AUDIO, SOURCE_IMAGE, SOURCE_GALLERY, SOURCE_FILE_ACCORDION ])
+	SOURCE_GALLERY.select(select_uploaded_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
+	LIBRARY_GALLERY.select(select_library_face, outputs = [ SOURCE_IMAGE, SOURCE_FILE_ACCORDION ])
 	SAVE_LIBRARY_BUTTON.click(save_to_library, outputs = [ LIBRARY_GALLERY ])
 	REFRESH_LIBRARY_BUTTON.click(refresh_library, outputs = [ LIBRARY_GALLERY ])
 
 
-def update(files : List[File]) -> Tuple[gradio.Audio, gradio.Image, gradio.Gallery]:
+def update(files : List[File]) -> Tuple[gradio.Audio, gradio.Image, gradio.Gallery, gradio.Accordion]:
 	global CURRENT_UPLOAD_PATHS
+	clear_faces()
 	file_names = [ file.name for file in files ] if files else None
 	has_source_audio = has_audio(file_names)
 	has_source_image = has_image(file_names)
@@ -139,28 +148,30 @@ def update(files : List[File]) -> Tuple[gradio.Audio, gradio.Image, gradio.Galle
 		source_image_path = get_first(image_paths)
 		state_manager.set_item('source_paths', [ source_image_path ] if source_image_path else file_names)
 		gallery_update = gradio.Gallery(value = image_paths if len(image_paths) > 1 else None, visible = len(image_paths) > 1)
-		return gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update
+		return gradio.Audio(value = source_audio_path, visible = has_source_audio), gradio.Image(value = source_image_path, visible = has_source_image), gallery_update, gradio.Accordion(open = False)
 
 	state_manager.clear_item('source_paths')
-	return gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False)
+	return gradio.Audio(value = None, visible = False), gradio.Image(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion()
 
 
-def select_uploaded_face(evt : gradio.SelectData) -> gradio.Image:
+def select_uploaded_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion]:
 	global CURRENT_UPLOAD_PATHS
+	clear_faces()
 	selected_path = extract_selected_path(evt, CURRENT_UPLOAD_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		return gradio.Image(value = selected_path, visible = True)
-	return gradio.Image()
+		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False)
+	return gradio.Image(), gradio.Accordion()
 
 
-def select_library_face(evt : gradio.SelectData) -> gradio.Image:
+def select_library_face(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio.Accordion]:
 	global CURRENT_LIBRARY_PATHS
+	clear_faces()
 	selected_path = extract_selected_path(evt, CURRENT_LIBRARY_PATHS)
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('source_paths', [ selected_path ])
-		return gradio.Image(value = selected_path, visible = True)
-	return gradio.Image()
+		return gradio.Image(value = selected_path, visible = True), gradio.Accordion(open = False)
+	return gradio.Image(), gradio.Accordion()
 
 
 def save_to_library() -> gradio.Gallery:

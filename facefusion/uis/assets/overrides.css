@@ -214,3 +214,12 @@
 	width: 100% !important;
 	object-fit: cover !important;
 }
+
+:root:root:root:root .compact-file-upload .file-preview-holder,
+:root:root:root:root .compact-file-upload div[class*="file-preview-holder"],
+:root:root:root:root .compact-file-upload ul[class*="file-preview"],
+:root:root:root:root .compact-file-upload .file-list
+{
+	max-height: 110px !important;
+	overflow-y: auto !important;
+}
