@@ -129,6 +129,7 @@ def listen() -> None:
 
 	for ui_component in get_ui_components(
 	[
+		'target_file',
 		'target_image',
 		'target_video'
 	]):

@@ -144,6 +144,7 @@ def render() -> None:
 		TARGET_IMAGE = gradio.Image(**target_image_options)
 		TARGET_VIDEO = gradio.Video(**target_video_options)
 
+	register_ui_component('target_file', TARGET_FILE)
 	register_ui_component('target_image', TARGET_IMAGE)
 	register_ui_component('target_video', TARGET_VIDEO)
 	register_ui_component('target_gallery', TARGET_GALLERY)
@@ -168,11 +169,18 @@ def get_button_resets() -> List[gradio.Button]:
 def listen() -> None:
 	save_btn = get_ui_component('save_preview_to_target_button')
 	batch_save_btn = get_ui_component('batch_save_preview_button')
+	preview_image = get_ui_component('preview_image')
+
 	gallery_outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_FILE_ACCORDION, TARGET_GALLERY, TARGET_LIBRARY_GALLERY ]
 	if save_btn:
 		gallery_outputs.append(save_btn)
 	if batch_save_btn:
 		gallery_outputs.append(batch_save_btn)
+
+	clear_outputs = list(gallery_outputs)
+	if preview_image:
+		clear_outputs.append(preview_image)
+
 	update_outputs = [ TARGET_IMAGE, TARGET_VIDEO, TARGET_GALLERY, TARGET_FILE_ACCORDION ]
 	if save_btn:
 		update_outputs.append(save_btn)
@@ -180,12 +188,17 @@ def listen() -> None:
 		update_outputs.append(batch_save_btn)
 
 	TARGET_FILE.change(update, inputs = TARGET_FILE, outputs = update_outputs)
+	TARGET_FILE.clear(clear_target_files, outputs = update_outputs)
 	TARGET_GALLERY.select(select_uploaded_target, outputs = gallery_outputs)
 	TARGET_LIBRARY_GALLERY.select(select_library_target, outputs = gallery_outputs)
 	SAVE_TARGET_BUTTON.click(save_to_library, outputs = [ TARGET_LIBRARY_GALLERY ])
-	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = gallery_outputs)
+	CLEAR_TARGET_BUTTON.click(clear_target_preview, outputs = clear_outputs)
 	REMOVE_TARGET_BUTTON.click(remove_from_library, outputs = [ TARGET_LIBRARY_GALLERY, TARGET_IMAGE, TARGET_VIDEO ])
 	REFRESH_TARGET_BUTTON.click(refresh_library, outputs = [ TARGET_LIBRARY_GALLERY ])
+
+
+def clear_target_files() -> Tuple[Any, ...]:
+	return update([])
 
 
 def update(files : List[File]) -> Tuple[Any, ...]:
@@ -223,6 +236,11 @@ def update(files : List[File]) -> Tuple[Any, ...]:
 			return (gradio.Image(value = None, visible = False), gradio.Video(value = first_file, visible = True), gallery_update, gradio.Accordion(open = False), *resets)
 
 	state_manager.clear_item('target_path')
+	try:
+		from facefusion.uis.components.preview import clear_hold_preview_frame
+		clear_hold_preview_frame()
+	except Exception:
+		pass
 	return (gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Gallery(value = None, visible = False), gradio.Accordion(), *resets)
 
 
@@ -235,7 +253,10 @@ def clear_target_preview() -> Tuple[Any, ...]:
 		pass
 	state_manager.clear_item('target_path')
 	resets = get_button_resets()
-	return (gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), *resets)
+	results = [ gradio.Image(value = None, visible = False), gradio.Video(value = None, visible = False), gradio.Accordion(open = True), gradio.Gallery(selected_index = None), gradio.Gallery(selected_index = None), *resets ]
+	if get_ui_component('preview_image'):
+		results.append(gradio.Image(value = None, elem_classes = None))
+	return tuple(results)
 
 
 def select_uploaded_target(evt : gradio.SelectData) -> Tuple[Any, ...]:

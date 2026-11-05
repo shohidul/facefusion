@@ -166,14 +166,20 @@ def listen() -> None:
 			getattr(ui_component, method)(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = preview_outputs)
 
 	target_image = get_ui_component('target_image')
+	target_file = get_ui_component('target_file')
+	t_outputs = [ PREVIEW_IMAGE ]
+	if SAVE_PREVIEW_TO_TARGET_BUTTON:
+		t_outputs.append(SAVE_PREVIEW_TO_TARGET_BUTTON)
+	if BATCH_SAVE_PREVIEWS_BUTTON:
+		t_outputs.append(BATCH_SAVE_PREVIEWS_BUTTON)
+
 	if target_image:
-		t_outputs = [ PREVIEW_IMAGE ]
-		if SAVE_PREVIEW_TO_TARGET_BUTTON:
-			t_outputs.append(SAVE_PREVIEW_TO_TARGET_BUTTON)
-		if BATCH_SAVE_PREVIEWS_BUTTON:
-			t_outputs.append(BATCH_SAVE_PREVIEWS_BUTTON)
 		target_image.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = t_outputs)
 		target_image.clear(target_clear_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = t_outputs)
+
+	if target_file:
+		target_file.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = t_outputs)
+		target_file.clear(target_clear_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = t_outputs)
 
 	if SAVE_PREVIEW_TO_TARGET_BUTTON:
 		outputs = [ SAVE_PREVIEW_TO_TARGET_BUTTON, PREVIEW_IMAGE ]
@@ -338,6 +344,12 @@ def get_button_resets() -> List[gradio.Button]:
 def target_change_preview_update(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0) -> Any:
 	global HOLD_PREVIEW_FRAME
 	resets = get_button_resets()
+	if not state_manager.get_item('target_path'):
+		clear_faces()
+		clear_hold_preview_frame()
+		img = gradio.Image(value = None, elem_classes = None)
+		return (img, *resets) if resets else img
+
 	if HOLD_PREVIEW_FRAME is not None:
 		img = gradio.Image(value = HOLD_PREVIEW_FRAME, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(HOLD_PREVIEW_FRAME) ])
 	else:
@@ -350,7 +362,7 @@ def target_clear_preview_update(preview_mode : PreviewMode, preview_resolution :
 	clear_faces()
 	clear_hold_preview_frame()
 	resets = get_button_resets()
-	img = update_preview_image(preview_mode, preview_resolution, frame_number)
+	img = gradio.Image(value = None, elem_classes = None)
 	return (img, *resets) if resets else img
 
 
@@ -370,6 +382,8 @@ def preview_mode_change_and_update_preview(preview_mode : PreviewMode, preview_r
 
 def clear_and_update_preview_image(preview_mode : PreviewMode, preview_resolution : str, frame_number : int = 0, *args : Any, **kwargs : Any) -> Any:
 	clear_faces()
+	if not state_manager.get_item('target_path'):
+		clear_hold_preview_frame()
 	img = update_preview_image(preview_mode, preview_resolution, frame_number)
 	resets = get_button_resets()
 	return (img, *resets) if resets else img
