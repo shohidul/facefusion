@@ -25,6 +25,35 @@ from facefusion.vision import detect_frame_orientation, extract_vision_mask, fit
 
 PREVIEW_IMAGE : Optional[gradio.Image] = None
 SAVE_PREVIEW_TO_TARGET_BUTTON : Optional[gradio.Button] = None
+ORIGINAL_TARGET_FRAMES : dict[str, VisionFrame] = {}
+
+
+def get_original_target_frame(target_path : str) -> Optional[VisionFrame]:
+	if not target_path or is_video(target_path):
+		return None
+	filename = os.path.basename(target_path)
+	if target_path in ORIGINAL_TARGET_FRAMES:
+		return ORIGINAL_TARGET_FRAMES[target_path].copy()
+	if filename in ORIGINAL_TARGET_FRAMES:
+		return ORIGINAL_TARGET_FRAMES[filename].copy()
+
+	frame = read_static_image(target_path, 'rgba')
+	if is_vision_frame(frame):
+		ORIGINAL_TARGET_FRAMES[target_path] = frame.copy()
+		ORIGINAL_TARGET_FRAMES[filename] = frame.copy()
+		return frame.copy()
+	return None
+
+
+def register_original_target_frame(target_path : str, frame : Optional[VisionFrame] = None) -> None:
+	if not target_path or is_video(target_path):
+		return
+	filename = os.path.basename(target_path)
+	if not is_vision_frame(frame):
+		frame = read_static_image(target_path, 'rgba')
+	if is_vision_frame(frame):
+		ORIGINAL_TARGET_FRAMES[target_path] = frame.copy()
+		ORIGINAL_TARGET_FRAMES[filename] = frame.copy()
 
 
 def render() -> None:
@@ -60,13 +89,15 @@ def render() -> None:
 		preview_image_options['value'] = cv2.cvtColor(preview_vision_frame, cv2.COLOR_BGR2RGB)
 		preview_image_options['elem_classes'] = [ 'image-preview', 'is-' + detect_frame_orientation(preview_vision_frame) ]
 		preview_image_options['visible'] = True
-	PREVIEW_IMAGE = gradio.Image(**preview_image_options)
-	SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
-		'💾 Save Preview to Target (Replace on Disk)',
-		size = 'sm',
-		variant = 'primary',
-		elem_classes = [ 'save-preview-button' ]
-	)
+
+	with gradio.Group(elem_classes = [ 'preview-sticky-wrap' ]):
+		PREVIEW_IMAGE = gradio.Image(**preview_image_options)
+		SAVE_PREVIEW_TO_TARGET_BUTTON = gradio.Button(
+			'💾 Save Preview to Target (Replace on Disk)',
+			size = 'sm',
+			variant = 'primary',
+			elem_classes = [ 'save-preview-button' ]
+		)
 	register_ui_component('preview_image', PREVIEW_IMAGE)
 	register_ui_component('save_preview_to_target_button', SAVE_PREVIEW_TO_TARGET_BUTTON)
 
@@ -248,13 +279,22 @@ def process_preview_frame(reference_vision_frame : VisionFrame, source_vision_fr
 	target_vision_frames = [ restrict_frame(vision_frame, unpack_resolution(preview_resolution))[:, :, :3] for vision_frame in target_vision_frames ]
 	temp_vision_frame = target_vision_frame.copy()
 
+	original_frame = get_original_target_frame(state_manager.get_item('target_path'))
+	if is_vision_frame(original_frame):
+		original_target_vision_frame = restrict_frame(original_frame, unpack_resolution(preview_resolution))
+		orig_mask = extract_vision_mask(original_target_vision_frame)
+		original_target_vision_frame = merge_vision_mask(original_target_vision_frame, orig_mask)
+	else:
+		original_target_vision_frame = target_vision_frame
+
 	if analyse_frame(target_vision_frame[:, :, :3]):
 		if preview_mode == 'frame-by-frame':
+			orig_obscured = obscure_frame(original_target_vision_frame[:, :, :3])
 			temp_vision_frame = obscure_frame(temp_vision_frame[:, :, :3])
-			return numpy.hstack((temp_vision_frame, temp_vision_frame))
+			return numpy.hstack((orig_obscured, temp_vision_frame))
 
 		if preview_mode == 'face-by-face':
-			target_crop_vision_frame, output_crop_vision_frame = create_face_by_face(reference_vision_frame, source_vision_frames, target_vision_frame[:, :, :3], temp_vision_frame[:, :, :3])
+			target_crop_vision_frame, output_crop_vision_frame = create_face_by_face(reference_vision_frame, source_vision_frames, original_target_vision_frame[:, :, :3], temp_vision_frame[:, :, :3])
 			target_crop_vision_frame = obscure_frame(target_crop_vision_frame)
 			output_crop_vision_frame = obscure_frame(output_crop_vision_frame)
 			return numpy.hstack((target_crop_vision_frame, output_crop_vision_frame))
@@ -281,10 +321,10 @@ def process_preview_frame(reference_vision_frame : VisionFrame, source_vision_fr
 	temp_vision_frame = prepare_output_frame(target_vision_frame, temp_vision_frame, temp_vision_mask)
 
 	if preview_mode == 'frame-by-frame':
-		return numpy.hstack((target_vision_frame, temp_vision_frame))
+		return numpy.hstack((original_target_vision_frame, temp_vision_frame))
 
 	if preview_mode == 'face-by-face':
-		target_crop_vision_frame, output_crop_vision_frame = create_face_by_face(reference_vision_frame, source_vision_frames, target_vision_frame, temp_vision_frame)
+		target_crop_vision_frame, output_crop_vision_frame = create_face_by_face(reference_vision_frame, source_vision_frames, original_target_vision_frame, temp_vision_frame)
 		return numpy.hstack((target_crop_vision_frame, output_crop_vision_frame))
 
 	return temp_vision_frame

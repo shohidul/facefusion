@@ -175,6 +175,11 @@ def update(files : List[File]) -> Tuple[gradio.Image, gradio.Video, gradio.Galle
 
 		if is_image(first_file):
 			state_manager.set_item('target_path', first_file)
+			try:
+				from facefusion.uis.components.preview import register_original_target_frame
+				register_original_target_frame(first_file)
+			except Exception:
+				pass
 			return gradio.Image(value = first_file, visible = True), gradio.Video(value = None, visible = False), gallery_update, gradio.Accordion(open = False)
 
 		if is_video(first_file):
@@ -198,6 +203,11 @@ def select_uploaded_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradi
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
 		if is_image(selected_path):
+			try:
+				from facefusion.uis.components.preview import register_original_target_frame
+				register_original_target_frame(selected_path)
+			except Exception:
+				pass
 			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False)
 		if is_video(selected_path):
 			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False)
@@ -211,6 +221,11 @@ def select_library_target(evt : gradio.SelectData) -> Tuple[gradio.Image, gradio
 	if selected_path and os.path.exists(selected_path):
 		state_manager.set_item('target_path', selected_path)
 		if is_image(selected_path):
+			try:
+				from facefusion.uis.components.preview import register_original_target_frame
+				register_original_target_frame(selected_path)
+			except Exception:
+				pass
 			return gradio.Image(value = selected_path, visible = True), gradio.Video(value = None, visible = False), gradio.Accordion(open = False)
 		if is_video(selected_path):
 			return gradio.Image(value = None, visible = False), gradio.Video(value = selected_path, visible = True), gradio.Accordion(open = False)
