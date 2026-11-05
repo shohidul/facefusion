@@ -339,7 +339,9 @@ def resolve_real_target_path(target_path : str) -> str:
 	if not target_path or not os.path.exists(target_path):
 		return target_path
 
+	from facefusion.filesystem import normalize_filename, resolve_real_file_path
 	filename = os.path.basename(target_path)
+	norm_target_name = normalize_filename(filename)
 
 	# 1. Directly check OUTPUT PATH (the active working/saving directory)
 	try:
@@ -350,6 +352,11 @@ def resolve_real_target_path(target_path : str) -> str:
 				direct_candidate = os.path.join(out_str, filename)
 				if os.path.isfile(direct_candidate):
 					return direct_candidate
+				for entry in os.listdir(out_str):
+					if normalize_filename(entry) == norm_target_name:
+						cand = os.path.join(out_str, entry)
+						if os.path.isfile(cand):
+							return cand
 	except Exception:
 		pass
 
@@ -360,10 +367,12 @@ def resolve_real_target_path(target_path : str) -> str:
 			return TARGET_ORIGIN_MAP[target_path]
 		if filename in TARGET_ORIGIN_MAP:
 			return TARGET_ORIGIN_MAP[filename]
+		for k, v in TARGET_ORIGIN_MAP.items():
+			if normalize_filename(k) == norm_target_name:
+				return v
 	except Exception:
 		pass
 
-	from facefusion.filesystem import resolve_real_file_path
 	real_path = resolve_real_file_path(target_path)
 	try:
 		from facefusion.uis.components.target import TARGET_ORIGIN_MAP

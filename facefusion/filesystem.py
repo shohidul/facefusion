@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 import shutil
 import subprocess
 from typing import List, Optional, Tuple
@@ -191,6 +192,10 @@ def resolve_relative_path(path : str) -> str:
 	return os.path.abspath(os.path.join(os.path.dirname(__file__), path))
 
 
+def normalize_filename(filename : str) -> str:
+	return re.sub(r'[\s\u2000-\u206F\u00A0_]+', '', filename).lower()
+
+
 def resolve_real_file_path(file_path : str) -> str:
 	if not file_path or not os.path.exists(file_path):
 		return file_path
@@ -208,6 +213,7 @@ def resolve_real_file_path(file_path : str) -> str:
 		return file_path
 
 	filename = os.path.basename(file_path)
+	norm_target_name = normalize_filename(filename)
 
 	# 1. Check active output_path directory first
 	try:
@@ -219,6 +225,11 @@ def resolve_real_file_path(file_path : str) -> str:
 				direct_candidate = os.path.join(out_str, filename)
 				if os.path.isfile(direct_candidate):
 					return direct_candidate
+				for entry in os.listdir(out_str):
+					if normalize_filename(entry) == norm_target_name:
+						cand = os.path.join(out_str, entry)
+						if os.path.isfile(cand):
+							return cand
 	except Exception:
 		pass
 
@@ -231,12 +242,15 @@ def resolve_real_file_path(file_path : str) -> str:
 	mdfind_bin = shutil.which('mdfind') or '/usr/bin/mdfind'
 	if os.path.exists(mdfind_bin):
 		queries = [
-			f'kMDItemFSName == "{filename}"',
-			f'-name "{filename}"'
+			[ mdfind_bin, f'kMDItemFSName == "{filename}"' ],
+			[ mdfind_bin, '-name', filename ]
 		]
-		for q in queries:
+		cleaned_base = re.sub(r'[\s\u2000-\u206F\u00A0]+', '*', filename)
+		if cleaned_base != filename:
+			queries.append([ mdfind_bin, f'kMDItemFSName == "*{cleaned_base}*"' ])
+
+		for cmd in queries:
 			try:
-				cmd = [ mdfind_bin, q ] if not q.startswith('-') else [ mdfind_bin ] + q.split(maxsplit = 1)
 				proc = subprocess.run(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, text = True, timeout = 3)
 				if proc.returncode == 0:
 					matches = [ line.strip() for line in proc.stdout.splitlines() if line.strip() ]
@@ -245,13 +259,14 @@ def resolve_real_file_path(file_path : str) -> str:
 						if os.path.isfile(m) and not any(t in m.lower() for t in [ '/gradio/', '/tmpdir/', '/tmp/', '/temp/', '/var/folders/', 'appdata/local/temp' ])
 					]
 					if real_matches:
-						def score_match(m : str) -> Tuple[int, float]:
+						def score_match(m : str) -> Tuple[int, int, float]:
 							try:
+								exact_name = 1 if normalize_filename(os.path.basename(m)) == norm_target_name else 0
 								exact_size = 1 if target_size > 0 and os.path.getsize(m) == target_size else 0
 								mtime = os.path.getmtime(m)
-								return (exact_size, mtime)
+								return (exact_name, exact_size, mtime)
 							except Exception:
-								return (0, 0.0)
+								return (0, 0, 0.0)
 
 						real_matches.sort(key = score_match, reverse = True)
 						return real_matches[0]
@@ -264,19 +279,16 @@ def resolve_real_file_path(file_path : str) -> str:
 			for vol in os.listdir('/Volumes'):
 				vol_path = os.path.join('/Volumes', vol)
 				if os.path.isdir(vol_path) and not vol.startswith('.'):
-					direct = os.path.join(vol_path, filename)
-					if os.path.isfile(direct):
-						return direct
-
 					for root, dirs, files in os.walk(vol_path):
 						depth = root[len(vol_path):].count(os.sep)
 						if depth > 4:
 							dirs.clear()
 							continue
-						if filename in files:
-							candidate = os.path.join(root, filename)
-							if os.path.isfile(candidate):
-								return candidate
+						for f in files:
+							if normalize_filename(f) == norm_target_name:
+								cand = os.path.join(root, f)
+								if os.path.isfile(cand):
+									return cand
 		except Exception:
 			pass
 
