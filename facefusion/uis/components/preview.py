@@ -150,8 +150,8 @@ def listen() -> None:
 		target_image.change(target_change_preview_update, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 		target_image.clear(clear_and_update_preview_image, inputs = [ preview_mode_dropdown, preview_resolution_dropdown, preview_frame_slider ], outputs = PREVIEW_IMAGE)
 
-	if target_image and SAVE_PREVIEW_TO_TARGET_BUTTON:
-		outputs = [ target_image, PREVIEW_IMAGE, SAVE_PREVIEW_TO_TARGET_BUTTON ]
+	if SAVE_PREVIEW_TO_TARGET_BUTTON:
+		outputs = [ SAVE_PREVIEW_TO_TARGET_BUTTON ]
 		if reference_face_position_gallery:
 			outputs.append(reference_face_position_gallery)
 		SAVE_PREVIEW_TO_TARGET_BUTTON.click(save_preview_to_target, outputs = outputs)
@@ -472,7 +472,7 @@ def save_preview_to_target() -> Any:
 	reference_face_position_gallery = get_ui_component('reference_face_position_gallery')
 
 	def fallback() -> Tuple[Any, ...]:
-		fails = [ gradio.Image(), gradio.Image(), gradio.Button(value = '❌ Failed to Save (Check Target)') ]
+		fails = [ gradio.Button(value = '❌ Failed to Save (Check Target)') ]
 		if reference_face_position_gallery:
 			fails.append(gradio.Gallery())
 		return tuple(fails)
@@ -540,10 +540,7 @@ def save_preview_to_target() -> Any:
 			display_frame = cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGRA2RGBA) if (saved_vision_frame.ndim == 3 and saved_vision_frame.shape[2] == 4) else cv2.cvtColor(saved_vision_frame, cv2.COLOR_BGR2RGB)
 			set_hold_preview_frame(display_frame)
 
-			target_img_out = gradio.Image(value = display_frame, visible = True)
-			preview_img_out = gradio.Image(value = display_frame, visible = True, elem_classes = [ 'image-preview', 'is-' + detect_frame_orientation(saved_vision_frame) ])
-
-			success_results = [ target_img_out, preview_img_out, save_btn_out ]
+			success_results = [ save_btn_out ]
 			if reference_face_position_gallery:
 				try:
 					from facefusion.uis.components.face_selector import update_reference_position_gallery
