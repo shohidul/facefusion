@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 import gradio
 
 import facefusion.choices
-from facefusion import state_manager, translator
+from facefusion import config, state_manager, translator
 from facefusion.common_helper import calculate_float_step, calculate_int_step
 from facefusion.ffmpeg import get_available_encoder_set
 from facefusion.filesystem import is_image, is_video
@@ -107,7 +107,7 @@ def render() -> None:
 	)
 	OUTPUT_VIDEO_FPS_SLIDER = gradio.Slider(
 		label = translator.get('uis.output_video_fps_slider'),
-		value = state_manager.get_item('output_video_fps'),
+		value = state_manager.get_item('output_video_fps') or config.get_float_value('output_creation', 'output_video_fps', '10.0') or 10.0,
 		step = 0.01,
 		minimum = 1,
 		maximum = 60,
@@ -149,7 +149,8 @@ def remote_update() -> Tuple[gradio.Slider, gradio.Slider, gradio.Dropdown, grad
 	if is_image(state_manager.get_item('target_path')):
 		return gradio.Slider(visible = True), gradio.Slider(visible = True), gradio.Dropdown(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Dropdown(visible = False), gradio.Dropdown(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False)
 	if is_video(state_manager.get_item('target_path')):
-		state_manager.set_item('output_video_fps', detect_video_fps(state_manager.get_item('target_path')))
+		output_video_fps = config.get_float_value('output_creation', 'output_video_fps', '10.0') or 10.0
+		state_manager.set_item('output_video_fps', output_video_fps)
 		return gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Dropdown(visible = True), gradio.Slider(visible = True), gradio.Slider(visible = True), gradio.Dropdown(visible = True), gradio.Dropdown(visible = True), gradio.Slider(visible = True), gradio.Slider(visible = True), gradio.Slider(value = state_manager.get_item('output_video_fps'), visible = True)
 	return gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Dropdown(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Dropdown(visible = False), gradio.Dropdown(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False), gradio.Slider(visible = False)
 

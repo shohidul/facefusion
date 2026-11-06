@@ -149,6 +149,8 @@ def detect_video_fps(video_path : str) -> Optional[float]:
 
 
 def restrict_video_fps(video_path : str, fps : Fps) -> Fps:
+	if fps is None:
+		fps = 10.0
 	if is_video(video_path):
 		video_fps = detect_video_fps(video_path)
 		if video_fps < fps:
