@@ -118,9 +118,9 @@ def run() -> Tuple[gradio.Button, gradio.Button, gradio.Image, gradio.Video]:
 
 		state_manager.set_item('output_path', output_path)
 		if last_output_path and is_image(last_output_path):
-			return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = last_output_path, visible = True, elem_classes = [ 'output-image' ]), gradio.Video(value = None, visible = False)
+			return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = last_output_path, visible = True), gradio.Video(value = None, visible = False)
 		if last_output_path and is_video(last_output_path):
-			return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None, visible = False), gradio.Video(value = last_output_path, visible = True, elem_classes = [ 'output-video' ])
+			return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None, visible = False), gradio.Video(value = last_output_path, visible = True)
 		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None), gradio.Video(value = None)
 
 	if is_directory(step_args.get('output_path')):
@@ -129,9 +129,9 @@ def run() -> Tuple[gradio.Button, gradio.Button, gradio.Image, gradio.Video]:
 		create_and_run_job(step_args)
 		state_manager.set_item('output_path', output_path)
 	if is_image(step_args.get('output_path')):
-		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = step_args.get('output_path'), visible = True, elem_classes = [ 'output-image' ]), gradio.Video(value = None, visible = False)
+		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = step_args.get('output_path'), visible = True), gradio.Video(value = None, visible = False)
 	if is_video(step_args.get('output_path')):
-		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None, visible = False), gradio.Video(value = step_args.get('output_path'), visible = True, elem_classes = [ 'output-video' ])
+		return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None, visible = False), gradio.Video(value = step_args.get('output_path'), visible = True)
 	return gradio.Button(visible = True), gradio.Button(visible = False), gradio.Image(value = None), gradio.Video(value = None)
 
 

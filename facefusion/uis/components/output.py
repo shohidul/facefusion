@@ -8,7 +8,6 @@ import gradio
 from facefusion import state_manager, translator
 from facefusion.filesystem import is_image, is_video
 from facefusion.uis.core import get_ui_components, register_ui_component
-from facefusion.vision import detect_video_resolution
 
 OUTPUT_PATH_TEXTBOX : Optional[gradio.Textbox] = None
 OUTPUT_IMAGE : Optional[gradio.Image] = None
@@ -31,25 +30,14 @@ def render() -> None:
 	)
 
 	target_path = state_manager.get_item('target_path')
-	video_classes = [ 'output-video' ]
-	if is_video(target_path):
-		resolution = detect_video_resolution(target_path)
-		if resolution and resolution[1] > resolution[0]:
-			video_classes.append('is-portrait')
-		else:
-			video_classes.append('is-landscape')
-	else:
-		video_classes.append('is-landscape')
 
 	OUTPUT_IMAGE = gradio.Image(
 		label = translator.get('uis.output_image_or_video'),
-		visible = is_image(target_path),
-		elem_classes = [ 'output-image' ]
+		visible = is_image(target_path)
 	)
 	OUTPUT_VIDEO = gradio.Video(
 		label = translator.get('uis.output_image_or_video'),
-		visible = is_video(target_path) or not is_image(target_path),
-		elem_classes = video_classes
+		visible = is_video(target_path) or not is_image(target_path)
 	)
 
 
@@ -68,14 +56,8 @@ def remote_update() -> Tuple[gradio.Image, gradio.Video]:
 	if is_image(target_path):
 		return gradio.Image(visible = True), gradio.Video(visible = False)
 	if is_video(target_path):
-		video_classes = [ 'output-video' ]
-		resolution = detect_video_resolution(target_path)
-		if resolution and resolution[1] > resolution[0]:
-			video_classes.append('is-portrait')
-		else:
-			video_classes.append('is-landscape')
-		return gradio.Image(visible = False), gradio.Video(visible = True, elem_classes = video_classes)
-	return gradio.Image(visible = False), gradio.Video(visible = True, elem_classes = [ 'output-video', 'is-landscape' ])
+		return gradio.Image(visible = False), gradio.Video(visible = True)
+	return gradio.Image(visible = False), gradio.Video(visible = True)
 
 
 def update_output_path(output_path : str) -> None:
