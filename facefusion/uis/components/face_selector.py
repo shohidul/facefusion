@@ -49,7 +49,7 @@ def render() -> None:
 		target_vision_frame = read_static_image(state_manager.get_item('target_path'))
 		reference_face_gallery_options['value'] = extract_gallery_frames(source_vision_frames, target_vision_frame)
 	if is_video(state_manager.get_item('target_path')):
-		target_vision_frame = read_video_frame(state_manager.get_item('target_path'), state_manager.get_item('reference_frame_number'))
+		target_vision_frame = read_video_frame(state_manager.get_item('target_path'), state_manager.get_item('reference_frame_number') or 0)
 		reference_face_gallery_options['value'] = extract_gallery_frames(source_vision_frames, target_vision_frame)
 	FACE_SELECTOR_MODE_DROPDOWN = gradio.Dropdown(
 		label = translator.get('uis.face_selector_mode_dropdown'),
@@ -240,7 +240,7 @@ def clear_reference_frame_number() -> None:
 	current_target_path = state_manager.get_item('target_path')
 	if current_target_path != LAST_TARGET_FRAME_PATH:
 		LAST_TARGET_FRAME_PATH = current_target_path
-		state_manager.clear_item('reference_frame_number')
+		state_manager.set_item('reference_frame_number', 0)
 
 
 def clear_and_update_reference_position_gallery() -> gradio.Gallery:
@@ -249,6 +249,8 @@ def clear_and_update_reference_position_gallery() -> gradio.Gallery:
 
 
 def update_reference_position_gallery(frame_number : int = 0) -> gradio.Gallery:
+	if frame_number is None:
+		frame_number = 0
 	gallery_vision_frames = []
 	source_vision_frames = read_static_images(filter_image_paths(state_manager.get_item('source_paths')))
 

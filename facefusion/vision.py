@@ -72,10 +72,14 @@ def restrict_image_resolution(image_path : str, resolution : Resolution) -> Reso
 
 @lru_cache(maxsize = 64)
 def read_static_video_frame(video_path : str, frame_number : int = 0) -> Optional[VisionFrame]:
+	if frame_number is None:
+		frame_number = 0
 	return read_video_frame(video_path, frame_number)
 
 
 def read_video_frame(video_path : str, frame_number : int = 0) -> Optional[VisionFrame]:
+	if frame_number is None:
+		frame_number = 0
 	if is_video(video_path):
 		video_reader = video_manager.get_reader(video_path, 'read_video_frame')
 
@@ -87,6 +91,10 @@ def read_video_frame(video_path : str, frame_number : int = 0) -> Optional[Visio
 
 
 def select_video_frames(video_path : str, frame_number : int = 0, frame_offset : int = 2) -> List[VisionFrame]:
+	if frame_number is None:
+		frame_number = 0
+	if frame_offset is None:
+		frame_offset = 2
 	vision_frames = []
 	frame_start = frame_number - frame_offset
 	frame_end = frame_number + frame_offset

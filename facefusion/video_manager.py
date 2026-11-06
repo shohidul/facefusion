@@ -35,8 +35,10 @@ def get_reader(video_path : str, context : str) -> VideoReader:
 
 
 def conditional_seek_video_reader(video_reader : VideoReader, frame_number : int = 0) -> None:
-	frame_total = video_reader.get('metadata').get('frame_total')
-	frame_number = min(frame_total - 1, frame_number)
+	if frame_number is None:
+		frame_number = 0
+	frame_total = video_reader.get('metadata').get('frame_total') or 0
+	frame_number = max(0, min(frame_total - 1, frame_number)) if frame_total > 0 else 0
 	skip_total = frame_number - video_reader.get('frame_number')
 	skip_margin = 128
 
@@ -48,6 +50,8 @@ def conditional_seek_video_reader(video_reader : VideoReader, frame_number : int
 
 
 def seek_video_reader(video_reader : VideoReader, frame_number : int = 0) -> None:
+	if frame_number is None:
+		frame_number = 0
 	close_video_reader(video_reader)
 
 	video_reader['process'] = ffmpeg.create_video_reader(video_reader.get('file_path'), frame_number, video_reader.get('metadata'))
